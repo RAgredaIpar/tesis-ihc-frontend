@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 
-// Componente interno auxiliar para animar los números de forma fluida
 function AnimatedValue({ value, duration = 1200, decimals = 0, isLocale = false }: { value: number; duration?: number; decimals?: number; isLocale?: boolean }) {
     const [current, setCurrent] = useState(0);
 
@@ -13,7 +12,6 @@ function AnimatedValue({ value, duration = 1200, decimals = 0, isLocale = false 
             if (!startTime) startTime = timestamp;
             const progress = Math.min((timestamp - startTime) / duration, 1);
 
-            // Función de desaceleración (Ease Out Quad) para un efecto natural
             const ease = progress * (2 - progress);
 
             setCurrent(ease * value);
@@ -36,7 +34,6 @@ function AnimatedValue({ value, duration = 1200, decimals = 0, isLocale = false 
 export default function MetricsTab() {
     const [mounted, setMounted] = useState(false);
 
-    // Activa la animación de las barras de progreso inmediatamente tras el montaje en el cliente
     useEffect(() => {
         setMounted(true);
     }, []);
@@ -61,7 +58,6 @@ export default function MetricsTab() {
     return (
         <div className="max-w-7xl mx-auto space-y-6 animate-fade-slide">
 
-            {/* CABECERA */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
                 <h2 className="text-xl font-bold text-[#00539C] uppercase tracking-wide">
                     Validación Estadística y Benchmarking Real
@@ -136,7 +132,6 @@ export default function MetricsTab() {
                     </p>
                 </div>
 
-                {/* TASAS PROBABILÍSTICAS CON BARRAS ANIMADAS */}
                 <div className="lg:col-span-5 bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col justify-between">
                     <div>
                         <h3 className="text-xs font-bold text-gray-700 uppercase tracking-widest mb-1">
@@ -199,7 +194,6 @@ export default function MetricsTab() {
                 </div>
             </div>
 
-            {/* TABLA DE BENCHMARKING CON DATOS TAMBIÉN ANIMADOS */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
                     <h3 className="text-xs font-bold text-gray-700 uppercase tracking-widest">
@@ -250,7 +244,6 @@ export default function MetricsTab() {
                 </div>
             </div>
 
-            {/* DISCUSIÓN TÉCNICA */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
                 <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">
                     Discusión de Resultados Computacionales Reales

@@ -48,7 +48,7 @@ export default function WorkspaceTab() {
         status: "En espera"
     });
 
-    const BACKEND_URL = "http://localhost:8000";
+    const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
     const handleFile = (selectedFile: File) => {
         setFile(selectedFile);
@@ -103,7 +103,7 @@ export default function WorkspaceTab() {
         }
     };
 
-    // Conmutador de la imagen principal según la pestaña activa
+    // BUSCA ESTA SECCIÓN (Línea 90 aprox.):
     const currentResultImage = apiResult
         ? (activeViewTab === "IHC Sintética"
             ? `${BACKEND_URL}${apiResult.visual_payloads.synthetic_ihc_url}`

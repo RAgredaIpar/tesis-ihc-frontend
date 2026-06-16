@@ -1,25 +1,29 @@
 "use client";
 
 import { useState, DragEvent, ChangeEvent } from "react";
-import { Client } from "@gradio/client";
 
 interface QueueItem {
     id: number;
     name: string;
     file: File;
     status: "espera" | "procesando" | "completado" | "error";
-    resultUrl: string | null;
+    resultUrl: string | null; // Aquí guardaremos directamente el string Base64 devuelto por la GPU
 }
 
 export default function BulkUploadTab() {
     const [queue, setQueue] = useState<QueueItem[]>([]);
     const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
-    // Estados de control de la UX (Idénticos a tu UploadZone)
+    // Estado para controlar el Modal de visualización médica integrada
+    const [modalImage, setModalImage] = useState<string | null>(null);
+
+    // Estados de control de la UX
     const [isDragging, setIsDragging] = useState<boolean>(false);
     const [showCheck, setShowCheck] = useState<boolean>(false);
 
-    // Procesar e inflar la cola con los nuevos archivos cargados
+    // URL Dinámica acoplada a tus variables de entorno de Vercel / Localhost
+    const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
     const agregarArchivosACola = (files: FileList) => {
         const filesArray = Array.from(files);
         const newItems: QueueItem[] = filesArray.map((file, index) => ({
@@ -33,7 +37,6 @@ export default function BulkUploadTab() {
         setQueue((prev) => [...prev, ...newItems]);
         setShowCheck(true);
 
-        // Ocultar la animación de éxito tras 2 segundos
         setTimeout(() => {
             setShowCheck(false);
         }, 2000);
@@ -60,45 +63,54 @@ export default function BulkUploadTab() {
         }
     };
 
+    // MOTOR DE PROCESAMIENTO EN COLA SECUENCIAL SINTONIZADO CON FASTAPI
     const procesarLote = async () => {
         if (queue.length === 0 || isProcessing) return;
 
         setIsProcessing(true);
         const updatedQueue = [...queue];
 
-        try {
-            const client = await Client.connect("Rhfjfgzrdg/tesis-ihc-backend");
+        // Procesamos uno por uno para proteger la memoria VRAM de tu GPU local
+        for (let i = 0; i < updatedQueue.length; i++) {
+            if (updatedQueue[i].status === "completado") continue;
 
-            for (let i = 0; i < updatedQueue.length; i++) {
-                if (updatedQueue[i].status === "completado") continue;
+            updatedQueue[i].status = "procesando";
+            setQueue([...updatedQueue]);
 
-                updatedQueue[i].status = "procesando";
-                setQueue([...updatedQueue]);
+            // Empaquetar la imagen actual en formato Multipart FormData
+            const formData = new FormData();
+            formData.append("file", updatedQueue[i].file);
 
-                try {
-                    const res = (await client.predict("/procesar_imagen", {
-                        imagen_he: updatedQueue[i].file,
-                        modelo_seleccionado: "U-Net PRO (M2)",
-                    })) as { data: { url: string }[] };
-
-                    if (res.data && res.data.length > 0) {
-                        updatedQueue[i].status = "completado";
-                        updatedQueue[i].resultUrl = res.data[0].url;
-                    } else {
-                        updatedQueue[i].status = "error";
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/quantify`, {
+                    method: "POST",
+                    body: formData,
+                    headers: {
+                        "ngrok-skip-browser-warning": "true" // Bypass obligatorio de Ngrok
                     }
-                } catch (err) {
-                    console.error(`Error en archivo ${updatedQueue[i].name}:`, err);
+                });
+
+                if (!response.ok) throw new Error("Fallo en la inferencia del lote");
+
+                const data = await response.json();
+
+                if (data.status === "success" && data.visual_payloads?.synthetic_ihc_url) {
+                    updatedQueue[i].status = "completado";
+                    // Almacenamos el string Base64 puro en el estado de la cola
+                    updatedQueue[i].resultUrl = data.visual_payloads.synthetic_ihc_url;
+                } else {
                     updatedQueue[i].status = "error";
                 }
-
-                setQueue([...updatedQueue]);
+            } catch (err) {
+                console.error(`Error en archivo ${updatedQueue[i].name}:`, err);
+                updatedQueue[i].status = "error";
             }
-        } catch (error) {
-            console.error("Error de conexión con el cluster de IA:", error);
-        } finally {
-            setIsProcessing(false);
+
+            // Forzar actualización visual en la tabla por cada elemento procesado
+            setQueue([...updatedQueue]);
         }
+
+        setIsProcessing(false);
     };
 
     const limpiarCola = () => {
@@ -116,7 +128,6 @@ export default function BulkUploadTab() {
                         Panel de Control por Lotes
                     </h3>
 
-                    {/* DROPZONE TOTALMENTE HOMOLOGADO CON TUS ANIMACIONES COHERENTES */}
                     <div
                         onDragOver={handleDragOver}
                         onDragLeave={handleDragLeave}
@@ -136,25 +147,15 @@ export default function BulkUploadTab() {
                             disabled={isProcessing}
                         />
 
-                        {/* Caso A: Animación de Entrada Tipo Rappi */}
                         {showCheck ? (
                             <div className="flex flex-col items-center justify-center">
                                 <svg className="h-16 w-16 mb-2" viewBox="0 0 52 52">
-                                    <circle className="stroke-green-500 fill-none" strokeWidth="4" strokeDasharray="160"
-                                            strokeDashoffset="160" cx="26" cy="26" r="24"
-                                            style={{ animation: "drawCircle 0.6s ease-out forwards" }} />
-                                    <path className="stroke-green-500 fill-none" strokeWidth="4" strokeDasharray="50"
-                                          strokeDashoffset="50" d="M14.1 27.2l7.1 7.2 16.7-16.8"
-                                          style={{ animation: "drawCheck 0.4s ease-out 0.6s forwards" }} />
+                                    <circle className="stroke-green-500 fill-none" strokeWidth="4" strokeDasharray="160" strokeDashoffset="160" cx="26" cy="26" r="24" style={{ animation: "drawCircle 0.6s ease-out forwards" }} />
+                                    <path className="stroke-green-500 fill-none" strokeWidth="4" strokeDasharray="50" strokeDashoffset="50" d="M14.1 27.2l7.1 7.2 16.7-16.8" style={{ animation: "drawCheck 0.4s ease-out 0.6s forwards" }} />
                                 </svg>
                                 <p className="text-sm font-bold text-green-600">Lote anexado</p>
-                                <style>{`
-                  @keyframes drawCircle { to { stroke-dashoffset: 0; } }
-                  @keyframes drawCheck { to { stroke-dashoffset: 0; } }
-                `}</style>
                             </div>
                         ) : queue.length > 0 ? (
-                            /* Caso B: Lote en memoria listo */
                             <div className="flex flex-col items-center justify-center">
                                 <svg className="h-10 w-10 text-[#00539C] mb-3 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
@@ -163,7 +164,6 @@ export default function BulkUploadTab() {
                                 <p className="text-xs text-gray-400 mt-2">Haz clic o arrastra para añadir más muestras</p>
                             </div>
                         ) : (
-                            /* Caso C: Estado por defecto vacío */
                             <div className="flex flex-col items-center justify-center">
                                 <svg className={`h-10 w-10 mb-4 transition-colors ${isDragging ? 'text-[#00AEEF]' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
@@ -176,7 +176,6 @@ export default function BulkUploadTab() {
                         )}
                     </div>
 
-                    {/* Botones de acción del panel */}
                     <div className="space-y-2 mt-4">
                         <button
                             onClick={procesarLote}
@@ -195,7 +194,6 @@ export default function BulkUploadTab() {
                     </div>
                 </div>
 
-                {/* Resumen numérico del lote */}
                 <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200 text-xs space-y-3">
                     <h4 className="font-bold text-gray-400 uppercase tracking-widest border-b pb-2">Resumen del Lote</h4>
                     <div className="flex justify-between">
@@ -205,39 +203,34 @@ export default function BulkUploadTab() {
                     <div className="flex justify-between">
                         <span className="text-gray-500">Procesados:</span>
                         <span className="font-bold text-green-600 font-mono">
-              {queue.filter((item) => item.status === "completado").length}
-            </span>
+                            {queue.filter((item) => item.status === "completado").length}
+                        </span>
                     </div>
                     <div className="flex justify-between">
                         <span className="text-gray-500">Errores:</span>
                         <span className="font-bold text-red-500 font-mono">
-              {queue.filter((item) => item.status === "error").length}
-            </span>
+                            {queue.filter((item) => item.status === "error").length}
+                        </span>
                     </div>
                 </div>
             </aside>
 
-            {/* PANEL DERECHO: COLA DE DIAGNÓSTICO CON SU PROPIO SHIMMER BAR */}
+            {/* PANEL DERECHO: COLA DE DIAGNÓSTICO */}
             <section className="lg:col-span-8 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
                 <header className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
                     <h3 className="text-xs font-bold text-gray-700 uppercase tracking-widest">
-                        Cola de Diagnóstico Secuencial
+                        Cola de Diagnóstico Secuencial (GPU Local)
                     </h3>
                     {isProcessing && (
                         <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded font-bold uppercase animate-pulse">
-              Procesamiento Activo
-            </span>
+                            Procesamiento Activo
+                        </span>
                     )}
                 </header>
 
-                {/* BARRA DE CARGA GLOBAL DEL LOTE (SHIMMER) */}
                 {isProcessing && (
                     <div className="w-full bg-gray-100 h-1.5 overflow-hidden relative border-b border-gray-200">
                         <div className="absolute top-0 bottom-0 left-0 w-full bg-gradient-to-r from-[#00AEEF] via-white to-[#00AEEF] animate-shimmer-bar opacity-80" />
-                        <style>{`
-              @keyframes shimmer-bar { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
-              .animate-shimmer-bar { animation: shimmer-bar 1.5s infinite linear; }
-            `}</style>
                     </div>
                 )}
 
@@ -260,19 +253,19 @@ export default function BulkUploadTab() {
                                 </div>
 
                                 <div className="flex items-center gap-4">
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
-                      item.status === "completado" ? "bg-green-50 text-green-700 border border-green-100" :
-                          item.status === "procesando" ? "bg-amber-50 text-amber-700 border border-amber-200 animate-pulse" :
-                              item.status === "error" ? "bg-red-50 text-red-700 border border-red-100" :
-                                  "bg-gray-50 text-gray-500 border border-gray-100"
-                  }`}>
-                    {item.status === "espera" ? "En cola" : item.status}
-                  </span>
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
+                                        item.status === "completado" ? "bg-green-50 text-green-700 border border-green-100" :
+                                            item.status === "procesando" ? "bg-amber-50 text-amber-700 border border-amber-200 animate-pulse" :
+                                                item.status === "error" ? "bg-red-50 text-red-700 border border-red-100" :
+                                                    "bg-gray-50 text-gray-500 border border-gray-100"
+                                    }`}>
+                                        {item.status === "espera" ? "En cola" : item.status}
+                                    </span>
 
-                                    {item.resultUrl && (
+                                    {item.status === "completado" && item.resultUrl && (
                                         <button
-                                            onClick={() => window.open(item.resultUrl!, "_blank")}
-                                            className="text-xs font-bold text-[#00AEEF] hover:underline"
+                                            onClick={() => setModalImage(item.resultUrl)}
+                                            className="text-xs font-bold text-[#00AEEF] hover:underline cursor-pointer"
                                         >
                                             Ver IHC
                                         </button>
@@ -283,6 +276,40 @@ export default function BulkUploadTab() {
                     )}
                 </div>
             </section>
+
+            {/* --- MODAL CLÍNICO DE VISTA PREVIA INTEGRADO (BASE64 SAFE) --- */}
+            {modalImage && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+                    <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full overflow-hidden border border-gray-100 flex flex-col">
+                        <header className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                            <h3 className="text-sm font-bold text-gray-700 uppercase tracking-widest">
+                                Vista Previa: Inmunohistoquímica Sintética (U-Net PRO)
+                            </h3>
+                            <button
+                                onClick={() => setModalImage(null)}
+                                className="text-gray-400 hover:text-gray-600 text-sm font-bold bg-gray-200/60 hover:bg-gray-200 px-2.5 py-1 rounded transition-colors"
+                            >
+                                Esc
+                            </button>
+                        </header>
+                        <div className="bg-gray-100 p-6 flex items-center justify-center max-h-[500px]">
+                            <img
+                                src={modalImage}
+                                alt="Resultado IHC Lote"
+                                className="max-w-full max-h-[420px] object-contain rounded shadow-sm"
+                            />
+                        </div>
+                        <footer className="bg-gray-50 px-6 py-3 border-t border-gray-100 flex justify-end">
+                            <button
+                                onClick={() => setModalImage(null)}
+                                className="bg-[#00539C] hover:bg-[#004380] text-white text-xs font-bold px-4 py-2 rounded transition-colors"
+                            >
+                                Cerrar Ventana
+                            </button>
+                        </footer>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

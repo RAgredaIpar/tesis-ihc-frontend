@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { Client } from "@gradio/client";
 import UploadZone from "@/app/components/UploadZone";
 
 interface Metrics {
@@ -10,19 +9,38 @@ interface Metrics {
     status: string;
 }
 
-interface Results {
-    unet: string | null;
-    pix2pix: string | null;
+// Nueva estructura de datos que devuelve tu pipeline calibrado
+interface QuantifyResponse {
+    status: string;
+    metadata: {
+        request_id: string;
+        original_filename: string;
+    };
+    analytics: {
+        total_nuclei_detected: number;
+        positive_nuclei_count: number;
+        negative_nuclei_count: number;
+        positivity_index_percentage: number;
+    };
+    clinical_risk: {
+        level: string;
+        color_code: string;
+        description: string;
+    };
+    visual_payloads: {
+        synthetic_ihc_url: string;
+        audit_canvas_url: string;
+    };
 }
 
-type ModelType = "U-Net PRO (M2)" | "Pix2Pix (M1)";
+type ViewType = "IHC Sintética" | "Auditoría HSV";
 
 export default function WorkspaceTab() {
     const [file, setFile] = useState<File | null>(null);
     const [preview, setPreview] = useState<string | null>(null);
-    const [results, setResults] = useState<Results>({ unet: null, pix2pix: null });
+    const [apiResult, setApiResult] = useState<QuantifyResponse | null>(null);
     const [loading, setLoading] = useState<boolean>(false);
-    const [activeModelTab, setActiveModelTab] = useState<ModelType>("U-Net PRO (M2)");
+    const [activeViewTab, setActiveViewTab] = useState<ViewType>("IHC Sintética");
 
     const [metrics, setMetrics] = useState<Metrics>({
         time: "0.00",
@@ -30,10 +48,12 @@ export default function WorkspaceTab() {
         status: "En espera"
     });
 
+    const BACKEND_URL = "http://localhost:8000";
+
     const handleFile = (selectedFile: File) => {
         setFile(selectedFile);
         setPreview(URL.createObjectURL(selectedFile));
-        setResults({ unet: null, pix2pix: null });
+        setApiResult(null); // Resetear resultados al cargar nueva imagen
 
         const img = new Image();
         img.src = URL.createObjectURL(selectedFile);
@@ -45,47 +65,55 @@ export default function WorkspaceTab() {
     const procesarLamina = async () => {
         if (!file) return;
         setLoading(true);
-        setMetrics(prev => ({ ...prev, status: "Ejecutando inferencia dual..." }));
+        setMetrics(prev => ({ ...prev, status: "Procesando en GPU..." }));
 
         const startTime = performance.now();
+        const formData = new FormData();
+        formData.append("file", file);
 
         try {
-            const client = await Client.connect("Rhfjfgzrdg/tesis-ihc-backend");
+            // MODIFICA EL FETCH EN TU WORKSPACETAB.TSX PARA QUE QUEDE ASÍ:
+            const response = await fetch(`${BACKEND_URL}/api/quantify`, {
+                method: "POST",
+                body: formData,
+                headers: {
+                    // Este header le dice a Ngrok que no muestre la pantalla de advertencia y deje pasar la API
+                    "ngrok-skip-browser-warning": "true"
+                }
+            });
 
-            const [resUnet, resPix] = await Promise.all([
-                client.predict("/procesar_imagen", { imagen_he: file, modelo_seleccionado: "U-Net PRO (M2)" }) as Promise<{ data: { url: string }[] }>,
-                client.predict("/procesar_imagen", { imagen_he: file, modelo_seleccionado: "Pix2Pix (M1)" }) as Promise<{ data: { url: string }[] }>
-            ]);
+            if (!response.ok) throw new Error("Error en la inferencia del pipeline local");
 
+            const data: QuantifyResponse = await response.json();
             const endTime = performance.now();
             const timeInSeconds = ((endTime - startTime) / 1000).toFixed(2);
 
-            if (resUnet.data && resPix.data) {
-                setResults({
-                    unet: resUnet.data[0].url,
-                    pix2pix: resPix.data[0].url
-                });
-                setMetrics(prev => ({
-                    ...prev,
-                    time: timeInSeconds,
-                    status: "Completado"
-                }));
-            } else {
-                throw new Error("Respuesta inválida de la API");
-            }
+            setApiResult(data);
+            setMetrics(prev => ({
+                ...prev,
+                time: timeInSeconds,
+                status: "Completado"
+            }));
 
         } catch (error) {
             console.error(error);
-            setMetrics(prev => ({ ...prev, status: "Error de red" }));
+            setMetrics(prev => ({ ...prev, status: "Error de conexión" }));
         } finally {
             setLoading(false);
         }
     };
 
-    const currentResultImage = activeModelTab === "U-Net PRO (M2)" ? results.unet : results.pix2pix;
+    // Conmutador de la imagen principal según la pestaña activa
+    const currentResultImage = apiResult
+        ? (activeViewTab === "IHC Sintética"
+            ? `${BACKEND_URL}${apiResult.visual_payloads.synthetic_ihc_url}`
+            : `${BACKEND_URL}${apiResult.visual_payloads.audit_canvas_url}`)
+        : null;
 
     return (
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 animate-fade-slide">
+
+            {/* COLUMNA IZQUIERDA: CONTROLES Y MÉTRICAS */}
             <aside className="lg:col-span-4 flex flex-col gap-6">
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
                     <UploadZone onFileSelect={handleFile} loading={loading} />
@@ -104,9 +132,9 @@ export default function WorkspaceTab() {
                     </h3>
                     <ul className="space-y-3 text-sm">
                         <li className="flex justify-between items-center">
-                            <span className="text-gray-500">Modelo Activo</span>
-                            <span className="font-semibold text-[#00539C] bg-blue-50 px-2 py-1 rounded">
-                                {activeModelTab}
+                            <span className="text-gray-500">Pipeline de IA</span>
+                            <span className="font-semibold text-[#00539C] bg-blue-50 px-2 py-1 rounded text-xs">
+                                U-Net PRO + G51
                             </span>
                         </li>
                         <li className="flex justify-between items-center">
@@ -127,35 +155,34 @@ export default function WorkspaceTab() {
                 </div>
             </aside>
 
+            {/* COLUMNA DERECHA: VISOR PRINCIPAL Y REPORTE CLÍNICO */}
             <section className="lg:col-span-8 flex flex-col gap-6">
+
+                {/* RECUADRO DEL VISOR IMAGEN */}
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
                     <div className="bg-[#00539C] px-3 pt-3 flex justify-between items-end border-b-2 border-[#004380]">
                         <div className="flex items-end gap-1">
                             <button
-                                onClick={() => setActiveModelTab("U-Net PRO (M2)")}
+                                onClick={() => setActiveViewTab("IHC Sintética")}
                                 className={`px-5 py-2.5 text-sm font-bold tracking-wide rounded-t-lg transition-colors ${
-                                    activeModelTab === "U-Net PRO (M2)" ? "bg-white text-[#00539C]" : "bg-[#004380] text-blue-200 hover:bg-[#003B70]"
+                                    activeViewTab === "IHC Sintética" ? "bg-white text-[#00539C]" : "bg-[#004380] text-blue-200 hover:bg-[#003B70]"
                                 }`}
                             >
-                                U-Net PRO
+                                IHC Sintética
                             </button>
                             <button
-                                onClick={() => setActiveModelTab("Pix2Pix (M1)")}
+                                onClick={() => setActiveViewTab("Auditoría HSV")}
                                 className={`px-5 py-2.5 text-sm font-bold tracking-wide rounded-t-lg transition-colors ${
-                                    activeModelTab === "Pix2Pix (M1)" ? "bg-white text-[#00539C]" : "bg-[#004380] text-blue-200 hover:bg-[#003B70]"
+                                    activeViewTab === "Auditoría HSV" ? "bg-white text-[#00539C]" : "bg-[#004380] text-blue-200 hover:bg-[#003B70]"
                                 }`}
                             >
-                                Pix2Pix Base
+                                Auditoría HSV
                             </button>
                         </div>
 
                         <div className="pb-2 hidden sm:flex items-center gap-2 opacity-80">
-                            <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                            </svg>
                             <span className="text-white text-xs font-bold uppercase tracking-widest">
-                                Visor Principal
+                                Vista: {activeViewTab}
                             </span>
                         </div>
                     </div>
@@ -164,13 +191,13 @@ export default function WorkspaceTab() {
                         {loading ? (
                             <div className="flex flex-col items-center gap-3">
                                 <div className="w-12 h-12 border-4 border-gray-300 border-t-[#00539C] rounded-full animate-spin"></div>
-                                <span className="text-sm font-bold text-[#00539C] uppercase tracking-widest animate-pulse">Sintetizando IHC...</span>
+                                <span className="text-sm font-bold text-[#00539C] uppercase tracking-widest animate-pulse">Sintetizando y contando...</span>
                             </div>
                         ) : currentResultImage ? (
                             <img
-                                key={activeModelTab}
+                                key={activeViewTab}
                                 src={currentResultImage}
-                                alt={`Resultado ${activeModelTab}`}
+                                alt={`Resultado ${activeViewTab}`}
                                 className="w-full h-full object-contain animate-fade-slide"
                             />
                         ) : (
@@ -178,32 +205,66 @@ export default function WorkspaceTab() {
                                 <svg className="w-12 h-12 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                 </svg>
-                                <span className="text-sm uppercase tracking-widest font-medium">Panel de Visualización Inactivo</span>
+                                <span className="text-sm uppercase tracking-widest font-medium">Visor Inactivo - Ejecute el Diagnóstico</span>
                             </div>
                         )}
                     </div>
                 </div>
 
+                {/* NUEVO MÓDULO: REPORTE MOLECULAR INTEGRADO */}
+                {apiResult && (
+                    <div
+                        className="bg-white p-6 rounded-xl shadow-sm border-t-4 transition-all grid grid-cols-1 md:grid-cols-3 gap-6"
+                        style={{ borderTopColor: apiResult.clinical_risk.color_code }}
+                    >
+                        <div className="md:col-span-1 border-b md:border-b-0 md:border-r pb-4 md:pb-0 md:pr-4 flex flex-col justify-center">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Riesgo Proliferativo</span>
+                            <h4 className="text-2xl font-black mt-0.5" style={{ color: apiResult.clinical_risk.color_code }}>
+                                {apiResult.clinical_risk.level}
+                            </h4>
+                            <div className="mt-4">
+                                <span className="text-4xl font-extrabold tracking-tight text-gray-900">
+                                    {apiResult.analytics.positivity_index_percentage}%
+                                </span>
+                                <p className="text-xs text-gray-500 font-medium mt-0.5">Índice Pan-CK Calibrado</p>
+                            </div>
+                        </div>
+
+                        <div className="md:col-span-2 flex flex-col justify-between space-y-4">
+                            <p className="text-sm text-gray-600 leading-relaxed bg-slate-50 p-3 rounded border border-slate-100">
+                                {apiResult.clinical_risk.description}
+                            </p>
+                            <div className="grid grid-cols-3 gap-2 text-center">
+                                <div className="bg-slate-50 p-2 rounded border border-gray-100">
+                                    <p className="text-[10px] text-gray-400 font-bold uppercase">Detectadas</p>
+                                    <p className="text-lg font-bold text-gray-800">{apiResult.analytics.total_nuclei_detected}</p>
+                                </div>
+                                <div className="bg-red-50 p-2 rounded border border-red-100">
+                                    <p className="text-[10px] text-red-400 font-bold uppercase">DAB+ (Tumor)</p>
+                                    <p className="text-lg font-bold text-red-600">{apiResult.analytics.positive_nuclei_count}</p>
+                                </div>
+                                <div className="bg-blue-50 p-2 rounded border border-blue-100">
+                                    <p className="text-[10px] text-blue-400 font-bold uppercase">H- (Sanas)</p>
+                                    <p className="text-lg font-bold text-blue-600">{apiResult.analytics.negative_nuclei_count}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* REFERENCIA MORFOLÓGICA (SU IMAGEN ORIGINAL) */}
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
                     <div className="flex justify-between items-center mb-4">
                         <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest">
-                            Referencia Morfológica (H&E)
+                            Referencia de Entrada (Canal Hematoxilina / Filtro)
                         </h3>
-                        {preview && (
-                            <button
-                                onClick={() => window.open(preview, '_blank')}
-                                className="text-[10px] bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-1 rounded transition-colors"
-                            >
-                                Abrir en nueva pestaña
-                            </button>
-                        )}
                     </div>
 
-                    <div className="h-64 w-full bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden relative group">
+                    <div className="h-64 w-full bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden relative group">
                         {preview ? (
                             <img
                                 src={preview}
-                                alt="Entrada H&E"
+                                alt="Entrada Seleccionada"
                                 className="max-h-full max-w-full object-contain transition-transform duration-300 group-hover:scale-105"
                             />
                         ) : (
@@ -211,9 +272,6 @@ export default function WorkspaceTab() {
                                 <p className="text-xs text-gray-400 font-bold uppercase">Esperando carga de muestra</p>
                             </div>
                         )}
-                        <div className="absolute bottom-2 right-2 bg-black/50 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
-                            Ajustado al contenedor
-                        </div>
                     </div>
                 </div>
             </section>

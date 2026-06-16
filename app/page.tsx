@@ -18,8 +18,11 @@ export default function Dashboard() {
     useEffect(() => {
         const checkServer = async () => {
             try {
-                const res = await fetch("https://rhfjfgzrdg-tesis-ihc-backend.hf.space/info");
-                if (res.ok) {
+                // REDIRECCIÓN: Ahora apunta al health check oficial de tu FastAPI local
+                const res = await fetch("http://localhost:8000/api/health");
+                const data = await res.json();
+
+                if (res.ok && data.status === "online") {
                     setServerState("activo");
                 } else {
                     setServerState("inactivo");

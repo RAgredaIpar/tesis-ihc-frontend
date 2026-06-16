@@ -18,8 +18,16 @@ export default function Dashboard() {
     useEffect(() => {
         const checkServer = async () => {
             try {
-                // REDIRECCIÓN: Ahora apunta al health check oficial de tu FastAPI local
-                const res = await fetch("http://localhost:8000/api/health");
+                // 1. Jalamos la URL de Vercel (Ngrok) o usamos localhost por defecto en local
+                const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+                // 2. Agregamos el header para saltar la advertencia de Ngrok en el Health Check
+                const res = await fetch(`${baseUrl}/api/health`, {
+                    headers: {
+                        "ngrok-skip-browser-warning": "true"
+                    }
+                });
+
                 const data = await res.json();
 
                 if (res.ok && data.status === "online") {

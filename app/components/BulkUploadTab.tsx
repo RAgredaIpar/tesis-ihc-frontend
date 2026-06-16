@@ -7,8 +7,8 @@ interface QueueItem {
     name: string;
     file: File;
     status: "espera" | "procesando" | "completado" | "error";
-    syntheticIhc: string | null;  # Guardará el Base64 de la U-Net PRO
-    auditCanvas: string | null;   # Guardará el Base64 de la Auditoría HSV
+    syntheticIhc: string | null;
+    auditCanvas: string | null;
     positivityIndex: number | null;
     riskLevel: string | null;
     riskColor: string | null;
@@ -20,11 +20,9 @@ export default function BulkUploadTab() {
     const [queue, setQueue] = useState<QueueItem[]>([]);
     const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
-# Estados para el visor avanzado del Modal
     const [activeModalItem, setActiveModalItem] = useState<QueueItem | null>(null);
     const [modalViewTab, setModalViewTab] = useState<ModalViewType>("IHC Sintética");
 
-# Estados de la UX
     const [isDragging, setIsDragging] = useState<boolean>(false);
     const [showCheck, setShowCheck] = useState<boolean>(false);
 
@@ -73,7 +71,6 @@ export default function BulkUploadTab() {
         }
     };
 
-# CONSUMO SECUENCIAL DEL PIPELINE MULTI-OUTPUT
     const procesarLote = async () => {
         if (queue.length === 0 || isProcessing) return;
 
@@ -104,7 +101,6 @@ export default function BulkUploadTab() {
 
                 if (data.status === "success") {
                     updatedQueue[i].status = "completado";
-                # Capturamos de forma independiente los dos flujos Base64 y las métricas
                     updatedQueue[i].syntheticIhc = data.visual_payloads.synthetic_ihc_url;
                     updatedQueue[i].auditCanvas = data.visual_payloads.audit_canvas_url;
                     updatedQueue[i].positivityIndex = data.analytics.positivity_index_percentage;

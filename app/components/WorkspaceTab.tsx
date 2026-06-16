@@ -106,8 +106,8 @@ export default function WorkspaceTab() {
     // BUSCA ESTA SECCIÓN (Línea 90 aprox.):
     const currentResultImage = apiResult
         ? (activeViewTab === "IHC Sintética"
-            ? `${BACKEND_URL}${apiResult.visual_payloads.synthetic_ihc_url}`
-            : `${BACKEND_URL}${apiResult.visual_payloads.audit_canvas_url}`)
+            ? apiResult.visual_payloads.synthetic_ihc_url
+            : apiResult.visual_payloads.audit_canvas_url)
         : null;
 
     return (

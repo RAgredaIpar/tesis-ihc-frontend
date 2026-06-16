@@ -7,21 +7,27 @@ interface QueueItem {
     name: string;
     file: File;
     status: "espera" | "procesando" | "completado" | "error";
-    resultUrl: string | null; // Aquí guardaremos directamente el string Base64 devuelto por la GPU
+    syntheticIhc: string | null;  # Guardará el Base64 de la U-Net PRO
+    auditCanvas: string | null;   # Guardará el Base64 de la Auditoría HSV
+    positivityIndex: number | null;
+    riskLevel: string | null;
+    riskColor: string | null;
 }
+
+type ModalViewType = "IHC Sintética" | "Auditoría HSV";
 
 export default function BulkUploadTab() {
     const [queue, setQueue] = useState<QueueItem[]>([]);
     const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
-    // Estado para controlar el Modal de visualización médica integrada
-    const [modalImage, setModalImage] = useState<string | null>(null);
+# Estados para el visor avanzado del Modal
+    const [activeModalItem, setActiveModalItem] = useState<QueueItem | null>(null);
+    const [modalViewTab, setModalViewTab] = useState<ModalViewType>("IHC Sintética");
 
-    // Estados de control de la UX
+# Estados de la UX
     const [isDragging, setIsDragging] = useState<boolean>(false);
     const [showCheck, setShowCheck] = useState<boolean>(false);
 
-    // URL Dinámica acoplada a tus variables de entorno de Vercel / Localhost
     const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
     const agregarArchivosACola = (files: FileList) => {
@@ -31,7 +37,11 @@ export default function BulkUploadTab() {
             name: file.name,
             file: file,
             status: "espera",
-            resultUrl: null,
+            syntheticIhc: null,
+            auditCanvas: null,
+            positivityIndex: null,
+            riskLevel: null,
+            riskColor: null,
         }));
 
         setQueue((prev) => [...prev, ...newItems]);
@@ -63,21 +73,19 @@ export default function BulkUploadTab() {
         }
     };
 
-    // MOTOR DE PROCESAMIENTO EN COLA SECUENCIAL SINTONIZADO CON FASTAPI
+# CONSUMO SECUENCIAL DEL PIPELINE MULTI-OUTPUT
     const procesarLote = async () => {
         if (queue.length === 0 || isProcessing) return;
 
         setIsProcessing(true);
         const updatedQueue = [...queue];
 
-        // Procesamos uno por uno para proteger la memoria VRAM de tu GPU local
         for (let i = 0; i < updatedQueue.length; i++) {
             if (updatedQueue[i].status === "completado") continue;
 
             updatedQueue[i].status = "procesando";
             setQueue([...updatedQueue]);
 
-            // Empaquetar la imagen actual en formato Multipart FormData
             const formData = new FormData();
             formData.append("file", updatedQueue[i].file);
 
@@ -86,27 +94,30 @@ export default function BulkUploadTab() {
                     method: "POST",
                     body: formData,
                     headers: {
-                        "ngrok-skip-browser-warning": "true" // Bypass obligatorio de Ngrok
+                        "ngrok-skip-browser-warning": "true"
                     }
                 });
 
-                if (!response.ok) throw new Error("Fallo en la inferencia del lote");
+                if (!response.ok) throw new Error("Fallo en la inferencia");
 
                 const data = await response.json();
 
-                if (data.status === "success" && data.visual_payloads?.synthetic_ihc_url) {
+                if (data.status === "success") {
                     updatedQueue[i].status = "completado";
-                    // Almacenamos el string Base64 puro en el estado de la cola
-                    updatedQueue[i].resultUrl = data.visual_payloads.synthetic_ihc_url;
+                # Capturamos de forma independiente los dos flujos Base64 y las métricas
+                    updatedQueue[i].syntheticIhc = data.visual_payloads.synthetic_ihc_url;
+                    updatedQueue[i].auditCanvas = data.visual_payloads.audit_canvas_url;
+                    updatedQueue[i].positivityIndex = data.analytics.positivity_index_percentage;
+                    updatedQueue[i].riskLevel = data.clinical_risk.level;
+                    updatedQueue[i].riskColor = data.clinical_risk.color_code;
                 } else {
                     updatedQueue[i].status = "error";
                 }
             } catch (err) {
-                console.error(`Error en archivo ${updatedQueue[i].name}:`, err);
+                console.error(err);
                 updatedQueue[i].status = "error";
             }
 
-            // Forzar actualización visual en la tabla por cada elemento procesado
             setQueue([...updatedQueue]);
         }
 
@@ -121,7 +132,7 @@ export default function BulkUploadTab() {
     return (
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 animate-fade-slide">
 
-            {/* PANEL IZQUIERDO: CONTROLES DE CARGA */}
+            {/* PANEL IZQUIERDO */}
             <aside className="lg:col-span-4 flex flex-col gap-6">
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
                     <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">
@@ -150,8 +161,8 @@ export default function BulkUploadTab() {
                         {showCheck ? (
                             <div className="flex flex-col items-center justify-center">
                                 <svg className="h-16 w-16 mb-2" viewBox="0 0 52 52">
-                                    <circle className="stroke-green-500 fill-none" strokeWidth="4" strokeDasharray="160" strokeDashoffset="160" cx="26" cy="26" r="24" style={{ animation: "drawCircle 0.6s ease-out forwards" }} />
-                                    <path className="stroke-green-500 fill-none" strokeWidth="4" strokeDasharray="50" strokeDashoffset="50" d="M14.1 27.2l7.1 7.2 16.7-16.8" style={{ animation: "drawCheck 0.4s ease-out 0.6s forwards" }} />
+                                    <circle className="stroke-green-500 fill-none" strokeWidth="4" cx="26" cy="26" r="24" style={{ animation: "drawCircle 0.6s ease-out forwards" }} />
+                                    <path className="stroke-green-500 fill-none" strokeWidth="4" d="M14.1 27.2l7.1 7.2 16.7-16.8" style={{ animation: "drawCheck 0.4s ease-out 0.6s forwards" }} />
                                 </svg>
                                 <p className="text-sm font-bold text-green-600">Lote anexado</p>
                             </div>
@@ -161,17 +172,13 @@ export default function BulkUploadTab() {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                                 </svg>
                                 <p className="text-sm text-[#00539C] font-bold">Lote listo en memoria</p>
-                                <p className="text-xs text-gray-400 mt-2">Haz clic o arrastra para añadir más muestras</p>
                             </div>
                         ) : (
                             <div className="flex flex-col items-center justify-center">
-                                <svg className={`h-10 w-10 mb-4 transition-colors ${isDragging ? 'text-[#00AEEF]' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg className="h-10 w-10 mb-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                                 </svg>
-                                <p className="text-sm text-gray-600 font-medium">
-                                    {isDragging ? 'Suelte las imágenes aquí' : 'Arrastre las láminas o haga clic para explorar'}
-                                </p>
-                                <p className="text-xs text-gray-400 mt-2">Permite múltiples archivos JPG o PNG</p>
+                                <p className="text-sm text-gray-600 font-medium">Arrastre las láminas o haga clic</p>
                             </div>
                         )}
                     </div>
@@ -187,7 +194,7 @@ export default function BulkUploadTab() {
                         <button
                             onClick={limpiarCola}
                             disabled={isProcessing || queue.length === 0}
-                            className="w-full bg-white hover:bg-gray-50 text-gray-500 font-medium text-xs py-2 px-4 rounded border border-gray-200 transition-colors disabled:opacity-50"
+                            className="w-full bg-white hover:bg-gray-50 text-gray-500 font-medium text-xs py-2 px-4 rounded border border-gray-200 transition-colors"
                         >
                             Limpiar Cola de Espera
                         </button>
@@ -206,26 +213,15 @@ export default function BulkUploadTab() {
                             {queue.filter((item) => item.status === "completado").length}
                         </span>
                     </div>
-                    <div className="flex justify-between">
-                        <span className="text-gray-500">Errores:</span>
-                        <span className="font-bold text-red-500 font-mono">
-                            {queue.filter((item) => item.status === "error").length}
-                        </span>
-                    </div>
                 </div>
             </aside>
 
-            {/* PANEL DERECHO: COLA DE DIAGNÓSTICO */}
+            {/* PANEL DERECHO: COLA DE PROCESAMIENTO */}
             <section className="lg:col-span-8 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
                 <header className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
                     <h3 className="text-xs font-bold text-gray-700 uppercase tracking-widest">
                         Cola de Diagnóstico Secuencial (GPU Local)
                     </h3>
-                    {isProcessing && (
-                        <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded font-bold uppercase animate-pulse">
-                            Procesamiento Activo
-                        </span>
-                    )}
                 </header>
 
                 {isProcessing && (
@@ -237,19 +233,18 @@ export default function BulkUploadTab() {
                 <div className="flex-1 p-4 max-h-[600px] overflow-y-auto divide-y divide-gray-100">
                     {queue.length === 0 ? (
                         <div className="h-48 flex flex-col items-center justify-center text-gray-400 gap-2">
-                            <svg className="w-10 h-10 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
-                            </svg>
-                            <p className="text-xs uppercase tracking-widest font-medium">No hay muestras en la cola de espera</p>
+                            <p className="text-xs uppercase tracking-widest font-medium">No hay muestras en cola</p>
                         </div>
                     ) : (
                         queue.map((item) => (
                             <div key={item.id} className="py-3 flex justify-between items-center gap-4 group animate-fade-slide">
                                 <div className="flex-1 min-w-0">
                                     <p className="text-sm font-medium text-gray-700 truncate">{item.name}</p>
-                                    <p className="text-[10px] text-gray-400 mt-0.5 uppercase tracking-tighter">
-                                        Tamaño: {(item.file.size / (1024 * 1024)).toFixed(2)} MB
-                                    </p>
+                                    {item.status === "completado" && (
+                                        <p className="text-[11px] font-bold mt-0.5" style={{ color: item.riskColor || '#000' }}>
+                                            Índice Pan-CK: {item.positivityIndex}% — {item.riskLevel}
+                                        </p>
+                                    )}
                                 </div>
 
                                 <div className="flex items-center gap-4">
@@ -262,12 +257,15 @@ export default function BulkUploadTab() {
                                         {item.status === "espera" ? "En cola" : item.status}
                                     </span>
 
-                                    {item.status === "completado" && item.resultUrl && (
+                                    {item.status === "completado" && item.syntheticIhc && (
                                         <button
-                                            onClick={() => setModalImage(item.resultUrl)}
-                                            className="text-xs font-bold text-[#00AEEF] hover:underline cursor-pointer"
+                                            onClick={() => {
+                                                setActiveModalItem(item);
+                                                setModalViewTab("IHC Sintética"); // Resetea a la primera pestaña por defecto
+                                            }}
+                                            className="text-xs font-bold text-[#00539C] hover:underline cursor-pointer bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded transition-colors"
                                         >
-                                            Ver IHC
+                                            Ver Diagnóstico Dual
                                         </button>
                                     )}
                                 </div>
@@ -277,36 +275,83 @@ export default function BulkUploadTab() {
                 </div>
             </section>
 
-            {/* --- MODAL CLÍNICO DE VISTA PREVIA INTEGRADO (BASE64 SAFE) --- */}
-            {modalImage && (
+            {/* --- VISOR INTERACTIVO EN MODAL (MESA DE TRABAJO EN MINIATURA) --- */}
+            {activeModalItem && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
-                    <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full overflow-hidden border border-gray-100 flex flex-col">
-                        <header className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                            <h3 className="text-sm font-bold text-gray-700 uppercase tracking-widest">
-                                Vista Previa: Inmunohistoquímica Sintética (U-Net PRO)
-                            </h3>
+                    <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full overflow-hidden border border-gray-100 flex flex-col">
+
+                        {/* Selector de Pestañas dentro del Modal (Igual a la mesa de trabajo) */}
+                        <header className="bg-[#00539C] px-6 pt-3 flex justify-between items-end border-b-2 border-[#004380]">
+                            <div className="flex items-end gap-1">
+                                <button
+                                    onClick={() => setModalViewTab("IHC Sintética")}
+                                    className={`px-5 py-2.5 text-sm font-bold tracking-wide rounded-t-lg transition-colors ${
+                                        modalViewTab === "IHC Sintética" ? "bg-white text-[#00539C]" : "bg-[#004380] text-blue-200 hover:bg-[#003B70]"
+                                    }`}
+                                >
+                                    IHC Sintética
+                                </button>
+                                <button
+                                    onClick={() => setModalViewTab("Auditoría HSV")}
+                                    className={`px-5 py-2.5 text-sm font-bold tracking-wide rounded-t-lg transition-colors ${
+                                        modalViewTab === "Auditoría HSV" ? "bg-white text-[#00539C]" : "bg-[#004380] text-blue-200 hover:bg-[#003B70]"
+                                    }`}
+                                >
+                                    Auditoría HSV
+                                </button>
+                            </div>
                             <button
-                                onClick={() => setModalImage(null)}
-                                className="text-gray-400 hover:text-gray-600 text-sm font-bold bg-gray-200/60 hover:bg-gray-200 px-2.5 py-1 rounded transition-colors"
+                                onClick={() => setActiveModalItem(null)}
+                                className="text-white hover:text-blue-100 text-xs font-bold pb-2.5 tracking-wider uppercase"
                             >
-                                Esc
+                                Cerrar Visor ✕
                             </button>
                         </header>
-                        <div className="bg-gray-100 p-6 flex items-center justify-center max-h-[500px]">
-                            <img
-                                src={modalImage}
-                                alt="Resultado IHC Lote"
-                                className="max-w-full max-h-[420px] object-contain rounded shadow-sm"
-                            />
+
+                        {/* Cuerpo del Visor con Imagen Conmutada y Métricas del Archivo */}
+                        <div className="bg-gray-100 p-6 flex flex-col md:flex-row gap-6 items-stretch justify-center max-h-[550px] overflow-y-auto">
+
+                            {/* Lienzo de Renderizado */}
+                            <div className="flex-1 flex items-center justify-center bg-[#E2E8F0] rounded-xl border border-gray-200 p-2 min-h-[380px] relative overflow-hidden">
+                                <img
+                                    src={modalViewTab === "IHC Sintética" ? activeModalItem.syntheticIhc! : activeModalItem.auditCanvas!}
+                                    alt="Resultado Lote"
+                                    className="max-w-full max-h-[380px] object-contain animate-fade-slide"
+                                />
+                            </div>
+
+                            {/* Tarjeta de Reporte Lateral por Archivo */}
+                            <div className="w-full md:w-72 space-y-4 text-sm bg-white p-5 rounded-xl border border-gray-200 flex flex-col justify-between">
+                                <div className="space-y-4">
+                                    <div>
+                                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Identificador de Muestra</span>
+                                        <p className="font-semibold text-gray-700 truncate mt-0.5">{activeModalItem.name}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Índice Proliferativo</span>
+                                        <p className="text-3xl font-black mt-0.5" style={{ color: activeModalItem.riskColor || '#000' }}>
+                                            {activeModalItem.positivityIndex}%
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Categoría Diagnóstica</span>
+                                        <div className="mt-1">
+                                            <span className="font-bold uppercase text-[11px] px-2.5 py-1 rounded-md border border-gray-200 bg-slate-50" style={{ color: activeModalItem.riskColor || '#000' }}>
+                                                {activeModalItem.riskLevel}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <button
+                                    onClick={() => setActiveModalItem(null)}
+                                    className="w-full bg-[#00539C] hover:bg-[#004380] text-white font-bold text-xs py-2.5 px-4 rounded transition-colors uppercase tracking-wide mt-4"
+                                >
+                                    Volver a la Lista
+                                </button>
+                            </div>
+
                         </div>
-                        <footer className="bg-gray-50 px-6 py-3 border-t border-gray-100 flex justify-end">
-                            <button
-                                onClick={() => setModalImage(null)}
-                                className="bg-[#00539C] hover:bg-[#004380] text-white text-xs font-bold px-4 py-2 rounded transition-colors"
-                            >
-                                Cerrar Ventana
-                            </button>
-                        </footer>
                     </div>
                 </div>
             )}

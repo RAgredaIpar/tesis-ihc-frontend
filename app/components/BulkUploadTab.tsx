@@ -9,12 +9,13 @@ interface QueueItem {
     status: "espera" | "procesando" | "completado" | "error";
     syntheticIhc: string | null;
     auditCanvas: string | null;
+    scoreCam: string | null;
     positivityIndex: number | null;
     riskLevel: string | null;
     riskColor: string | null;
 }
 
-type ModalViewType = "IHC Sintética" | "Auditoría HSV";
+type ModalViewType = "IHC Sintética" | "Auditoría HSV" | "Score-CAM";
 
 export default function BulkUploadTab() {
     const [queue, setQueue] = useState<QueueItem[]>([]);
@@ -37,6 +38,7 @@ export default function BulkUploadTab() {
             status: "espera",
             syntheticIhc: null,
             auditCanvas: null,
+            scoreCam: null,
             positivityIndex: null,
             riskLevel: null,
             riskColor: null,
@@ -103,6 +105,7 @@ export default function BulkUploadTab() {
                     updatedQueue[i].status = "completado";
                     updatedQueue[i].syntheticIhc = data.visual_payloads.synthetic_ihc_url;
                     updatedQueue[i].auditCanvas = data.visual_payloads.audit_canvas_url;
+                    updatedQueue[i].scoreCam = data.visual_payloads.score_cam_url; // <-- Captura del Base64 XAI
                     updatedQueue[i].positivityIndex = data.analytics.positivity_index_percentage;
                     updatedQueue[i].riskLevel = data.clinical_risk.level;
                     updatedQueue[i].riskColor = data.clinical_risk.color_code;
@@ -180,12 +183,13 @@ export default function BulkUploadTab() {
                     </div>
 
                     <div className="space-y-2 mt-4">
+                        {/* REFACTORIZACIÓN DE TERMINOLOGÍA CLÍNICA UNIFICADA */}
                         <button
                             onClick={procesarLote}
                             disabled={isProcessing || queue.length === 0}
                             className="w-full bg-[#00539C] hover:bg-[#004380] text-white font-bold text-sm py-3 px-4 rounded transition-colors disabled:bg-gray-200 disabled:text-gray-400 uppercase tracking-wide shadow-sm"
                         >
-                            {isProcessing ? "Procesando Lote..." : "Iniciar Tinción en Bloque"}
+                            {isProcessing ? "Procesando Lote en GPU..." : "Iniciar Diagnóstico Virtual Masivo"}
                         </button>
                         <button
                             onClick={limpiarCola}
@@ -216,7 +220,7 @@ export default function BulkUploadTab() {
             <section className="lg:col-span-8 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
                 <header className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
                     <h3 className="text-xs font-bold text-gray-700 uppercase tracking-widest">
-                        Cola de Diagnóstico Secuencial (GPU Local)
+                        Cola de Diagnóstico por Lotes
                     </h3>
                 </header>
 
@@ -233,7 +237,7 @@ export default function BulkUploadTab() {
                         </div>
                     ) : (
                         queue.map((item) => (
-                            <div key={item.id} className="py-3 flex justify-between items-center gap-4 group animate-fade-slide">
+                            <div key={item.id} className="py-3.5 flex justify-between items-center gap-4 group animate-fade-slide hover:bg-slate-50/60 px-2 rounded-lg transition-colors">
                                 <div className="flex-1 min-w-0">
                                     <p className="text-sm font-medium text-gray-700 truncate">{item.name}</p>
                                     {item.status === "completado" && (
@@ -243,6 +247,7 @@ export default function BulkUploadTab() {
                                     )}
                                 </div>
 
+                                {/* MEJORA DE UX: ACCIÓN MÁS NATURAL Y COHERENTE */}
                                 <div className="flex items-center gap-4">
                                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
                                         item.status === "completado" ? "bg-green-50 text-green-700 border border-green-100" :
@@ -257,11 +262,11 @@ export default function BulkUploadTab() {
                                         <button
                                             onClick={() => {
                                                 setActiveModalItem(item);
-                                                setModalViewTab("IHC Sintética"); // Resetea a la primera pestaña por defecto
+                                                setModalViewTab("IHC Sintética");
                                             }}
-                                            className="text-xs font-bold text-[#00539C] hover:underline cursor-pointer bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded transition-colors"
+                                            className="text-xs font-bold text-[#00539C] bg-blue-50 border border-blue-200/60 hover:bg-[#00539C] hover:text-white px-3 py-1.5 rounded transition-all shadow-sm"
                                         >
-                                            Ver Diagnóstico Dual
+                                            Ver Reporte
                                         </button>
                                     )}
                                 </div>
@@ -274,9 +279,9 @@ export default function BulkUploadTab() {
             {/* --- VISOR INTERACTIVO EN MODAL (MESA DE TRABAJO EN MINIATURA) --- */}
             {activeModalItem && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
-                    <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full overflow-hidden border border-gray-100 flex flex-col">
+                    <div className="bg-white rounded-xl shadow-2xl max-w-5xl w-full overflow-hidden border border-gray-100 flex flex-col">
 
-                        {/* Selector de Pestañas dentro del Modal (Igual a la mesa de trabajo) */}
+                        {/* SELECTOR DE PESTAÑAS INTEGRADO CON TRES VÍAS (HOMOLOGADO AL WORKSPACE) */}
                         <header className="bg-[#00539C] px-6 pt-3 flex justify-between items-end border-b-2 border-[#004380]">
                             <div className="flex items-end gap-1">
                                 <button
@@ -295,10 +300,18 @@ export default function BulkUploadTab() {
                                 >
                                     Auditoría HSV
                                 </button>
+                                <button
+                                    onClick={() => setModalViewTab("Score-CAM")}
+                                    className={`px-5 py-2.5 text-sm font-bold tracking-wide rounded-t-lg transition-colors ${
+                                        modalViewTab === "Score-CAM" ? "bg-white text-[#00539C]" : "bg-[#004380] text-blue-200 hover:bg-[#003B70]"
+                                    }`}
+                                >
+                                    Score-CAM (XAI)
+                                </button>
                             </div>
                             <button
                                 onClick={() => setActiveModalItem(null)}
-                                className="text-white hover:text-blue-100 text-xs font-bold pb-2.5 tracking-wider uppercase"
+                                className="text-white hover:text-blue-100 text-xs font-bold pb-2.5 tracking-wider uppercase transition-colors"
                             >
                                 Cerrar Visor ✕
                             </button>
@@ -307,10 +320,16 @@ export default function BulkUploadTab() {
                         {/* Cuerpo del Visor con Imagen Conmutada y Métricas del Archivo */}
                         <div className="bg-gray-100 p-6 flex flex-col md:flex-row gap-6 items-stretch justify-center max-h-[550px] overflow-y-auto">
 
-                            {/* Lienzo de Renderizado */}
+                            {/* Lienzo de Renderizado Conmutado */}
                             <div className="flex-1 flex items-center justify-center bg-[#E2E8F0] rounded-xl border border-gray-200 p-2 min-h-[380px] relative overflow-hidden">
                                 <img
-                                    src={modalViewTab === "IHC Sintética" ? activeModalItem.syntheticIhc! : activeModalItem.auditCanvas!}
+                                    src={
+                                        modalViewTab === "IHC Sintética"
+                                            ? activeModalItem.syntheticIhc!
+                                            : modalViewTab === "Auditoría HSV"
+                                                ? activeModalItem.auditCanvas!
+                                                : activeModalItem.scoreCam!
+                                    }
                                     alt="Resultado Lote"
                                     className="max-w-full max-h-[380px] object-contain animate-fade-slide"
                                 />
@@ -341,7 +360,7 @@ export default function BulkUploadTab() {
 
                                 <button
                                     onClick={() => setActiveModalItem(null)}
-                                    className="w-full bg-[#00539C] hover:bg-[#004380] text-white font-bold text-xs py-2.5 px-4 rounded transition-colors uppercase tracking-wide mt-4"
+                                    className="w-full bg-[#00539C] hover:bg-[#004380] text-white font-bold text-xs py-2.5 px-4 rounded transition-colors uppercase tracking-wide mt-4 shadow-sm"
                                 >
                                     Volver a la Lista
                                 </button>

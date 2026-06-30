@@ -31,7 +31,22 @@ export default function BulkUploadTab() {
 
     const agregarArchivosACola = (files: FileList) => {
         const filesArray = Array.from(files);
-        const newItems: QueueItem[] = filesArray.map((file, index) => ({
+        const extensionesPermitidas = [".png", ".jpg", ".jpeg", ".tif", ".tiff"];
+
+        const archivosValidos = filesArray.filter((file) => {
+            const nombreMinuscula = file.name.toLowerCase();
+            return extensionesPermitidas.some((ext) => nombreMinuscula.endsWith(ext));
+        });
+
+        if (archivosValidos.length < filesArray.length) {
+            alert(
+                "⚠️ Formato no permitido: Se detectaron archivos inválidos. Solo se añadieron a la cola las imágenes histopatológicas (.png, .jpg, .jpeg, .tif, .tiff)."
+            );
+        }
+
+        if (archivosValidos.length === 0) return;
+
+        const newItems: QueueItem[] = archivosValidos.map((file, index) => ({
             id: Date.now() + index,
             name: file.name,
             file: file,
@@ -151,7 +166,7 @@ export default function BulkUploadTab() {
                         <input
                             type="file"
                             multiple
-                            accept="image/*"
+                            accept=".png,.jpg,.jpeg,.tif,.tiff"
                             onChange={handleFolderSelect}
                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                             disabled={isProcessing}

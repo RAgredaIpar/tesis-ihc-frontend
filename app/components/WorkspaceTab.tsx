@@ -53,10 +53,19 @@ export default function WorkspaceTab() {
     const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
     const handleFile = (selectedFile: File) => {
+        const extensionesPermitidas = [".png", ".jpg", ".jpeg", ".tif", ".tiff"];
+        const nombreMinuscula = selectedFile.name.toLowerCase();
+        const esValido = extensionesPermitidas.some((ext) => nombreMinuscula.endsWith(ext));
+
+        if (!esValido) {
+            alert("⚠️ Muestra digital rechazada. El sistema solo admite archivos de imagen médica en formato .png, .jpg, .jpeg, .tif o .tiff.");
+            return;
+        }
+
         setFile(selectedFile);
         setPreview(URL.createObjectURL(selectedFile));
-        setApiResult(null); // Resetear resultados al cargar nueva imagen
-        setActiveViewTab("IHC Sintética"); // Forzar reinicio de pestaña al primer tab
+        setApiResult(null);
+        setActiveViewTab("IHC Sintética");
 
         const img = new Image();
         img.src = URL.createObjectURL(selectedFile);

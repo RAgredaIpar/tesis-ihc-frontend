@@ -59,7 +59,7 @@ export default function UploadZone({ onFileSelect, loading }: UploadZoneProps) {
             >
                 <input
                     type="file"
-                    accept="image/*"
+                    accept=".png,.jpg,.jpeg,.tif,.tiff"
                     onChange={handleChange}
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                     disabled={loading}

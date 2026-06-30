@@ -9,7 +9,7 @@ interface Metrics {
     status: string;
 }
 
-// Nueva estructura de datos que devuelve tu pipeline calibrado
+// Estructura de datos ampliada que recibe la IHC, Auditoría HSV y el Mapa de Calor
 interface QuantifyResponse {
     status: string;
     metadata: {
@@ -30,10 +30,12 @@ interface QuantifyResponse {
     visual_payloads: {
         synthetic_ihc_url: string;
         audit_canvas_url: string;
+        score_cam_url: string; // <-- NUEVO: Canal para recibir la matriz XAI interpretada
     };
 }
 
-type ViewType = "IHC Sintética" | "Auditoría HSV";
+// Agregamos Score-CAM como un tipo de vista admitido por el componente
+type ViewType = "IHC Sintética" | "Auditoría HSV" | "Score-CAM";
 
 export default function WorkspaceTab() {
     const [file, setFile] = useState<File | null>(null);
@@ -54,6 +56,7 @@ export default function WorkspaceTab() {
         setFile(selectedFile);
         setPreview(URL.createObjectURL(selectedFile));
         setApiResult(null); // Resetear resultados al cargar nueva imagen
+        setActiveViewTab("IHC Sintética"); // Forzar reinicio de pestaña al primer tab
 
         const img = new Image();
         img.src = URL.createObjectURL(selectedFile);
@@ -72,12 +75,10 @@ export default function WorkspaceTab() {
         formData.append("file", file);
 
         try {
-            // MODIFICA EL FETCH EN TU WORKSPACETAB.TSX PARA QUE QUEDE ASÍ:
             const response = await fetch(`${BACKEND_URL}/api/quantify`, {
                 method: "POST",
                 body: formData,
                 headers: {
-                    // Este header le dice a Ngrok que no muestre la pantalla de advertencia y deje pasar la API
                     "ngrok-skip-browser-warning": "true"
                 }
             });
@@ -103,11 +104,13 @@ export default function WorkspaceTab() {
         }
     };
 
-    // BUSCA ESTA SECCIÓN (Línea 90 aprox.):
+    // Conmutador condicional de tres vías optimizado para lectura de Base64
     const currentResultImage = apiResult
         ? (activeViewTab === "IHC Sintética"
             ? apiResult.visual_payloads.synthetic_ihc_url
-            : apiResult.visual_payloads.audit_canvas_url)
+            : activeViewTab === "Auditoría HSV"
+                ? apiResult.visual_payloads.audit_canvas_url
+                : apiResult.visual_payloads.score_cam_url)
         : null;
 
     return (
@@ -158,7 +161,7 @@ export default function WorkspaceTab() {
             {/* COLUMNA DERECHA: VISOR PRINCIPAL Y REPORTE CLÍNICO */}
             <section className="lg:col-span-8 flex flex-col gap-6">
 
-                {/* RECUADRO DEL VISOR IMAGEN */}
+                {/* RECUADRO DEL VISOR IMAGEN MULTI-TAB */}
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
                     <div className="bg-[#00539C] px-3 pt-3 flex justify-between items-end border-b-2 border-[#004380]">
                         <div className="flex items-end gap-1">
@@ -178,6 +181,15 @@ export default function WorkspaceTab() {
                             >
                                 Auditoría HSV
                             </button>
+                            {/* NUEVO BOTÓN: INTERFAZ DE EXPLICABILIDAD PARA TESIS */}
+                            <button
+                                onClick={() => setActiveViewTab("Score-CAM")}
+                                className={`px-5 py-2.5 text-sm font-bold tracking-wide rounded-t-lg transition-colors ${
+                                    activeViewTab === "Score-CAM" ? "bg-white text-[#00539C]" : "bg-[#004380] text-blue-200 hover:bg-[#003B70]"
+                                }`}
+                            >
+                                Score-CAM (XAI)
+                            </button>
                         </div>
 
                         <div className="pb-2 hidden sm:flex items-center gap-2 opacity-80">
@@ -191,7 +203,7 @@ export default function WorkspaceTab() {
                         {loading ? (
                             <div className="flex flex-col items-center gap-3">
                                 <div className="w-12 h-12 border-4 border-gray-300 border-t-[#00539C] rounded-full animate-spin"></div>
-                                <span className="text-sm font-bold text-[#00539C] uppercase tracking-widest animate-pulse">Sintetizando y contando...</span>
+                                <span className="text-sm font-bold text-[#00539C] uppercase tracking-widest animate-pulse">Sintetizando y analizando matrices...</span>
                             </div>
                         ) : currentResultImage ? (
                             <img
@@ -211,7 +223,7 @@ export default function WorkspaceTab() {
                     </div>
                 </div>
 
-                {/* NUEVO MÓDULO: REPORTE MOLECULAR INTEGRADO */}
+                {/* REPORTE MOLECULAR INTEGRADO */}
                 {apiResult && (
                     <div
                         className="bg-white p-6 rounded-xl shadow-sm border-t-4 transition-all grid grid-cols-1 md:grid-cols-3 gap-6"

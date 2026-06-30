@@ -1,7 +1,7 @@
 import { ChangeEvent, DragEvent, useState } from 'react';
 
 interface UploadZoneProps {
-    onFileSelect: (file: File) => void;
+    onFileSelect: (file: File) => boolean;
     loading: boolean;
 }
 
@@ -11,13 +11,18 @@ export default function UploadZone({ onFileSelect, loading }: UploadZoneProps) {
     const [hasFile, setHasFile] = useState<boolean>(false);
 
     const processFile = (file: File) => {
-        setHasFile(true);
-        setShowCheck(true);
-        onFileSelect(file);
+        const esValido = onFileSelect(file);
 
-        setTimeout(() => {
+        if (esValido) {
+            setHasFile(true);
+            setShowCheck(true);
+            setTimeout(() => {
+                setShowCheck(false);
+            }, 2000);
+        } else {
+            setHasFile(false);
             setShowCheck(false);
-        }, 2000);
+        }
     };
 
     const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
@@ -102,7 +107,7 @@ export default function UploadZone({ onFileSelect, loading }: UploadZoneProps) {
                         <p className="text-sm text-gray-600 font-medium">
                             {isDragging ? 'Suelte la imagen aquí' : 'Arrastre la lámina o haga clic para explorar'}
                         </p>
-                        <p className="text-xs text-gray-400 mt-2">Formatos soportados: JPG, PNG</p>
+                        <p className="text-xs text-gray-400 mt-2">Formatos soportados: JPG, PNG, TIF, TIFF</p>
                     </div>
                 )}
             </div>

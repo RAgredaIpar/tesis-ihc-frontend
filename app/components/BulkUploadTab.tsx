@@ -7,6 +7,7 @@ interface QueueItem {
     name: string;
     file: File;
     status: "espera" | "procesando" | "completado" | "error";
+    errorDetail?: string; // <-- NUEVO: Captura el motivo exacto del rechazo biológico del backend
     syntheticIhc: string | null;
     auditCanvas: string | null;
     scoreCam: string | null;
@@ -95,7 +96,7 @@ export default function BulkUploadTab() {
         const updatedQueue = [...queue];
 
         for (let i = 0; i < updatedQueue.length; i++) {
-            if (updatedQueue[i].status === "completado") continue;
+            if (updatedQueue[i].status === "completado" || updatedQueue[i].status === "error") continue;
 
             updatedQueue[i].status = "procesando";
             setQueue([...updatedQueue]);
@@ -112,7 +113,11 @@ export default function BulkUploadTab() {
                     }
                 });
 
-                if (!response.ok) throw new Error("Fallo en la inferencia");
+                // Captura el error estructurado del backend (ej: el filtro espectral 422)
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.detail || "Error en el procesamiento analítico local.");
+                }
 
                 const data = await response.json();
 
@@ -120,16 +125,18 @@ export default function BulkUploadTab() {
                     updatedQueue[i].status = "completado";
                     updatedQueue[i].syntheticIhc = data.visual_payloads.synthetic_ihc_url;
                     updatedQueue[i].auditCanvas = data.visual_payloads.audit_canvas_url;
-                    updatedQueue[i].scoreCam = data.visual_payloads.score_cam_url; // <-- Captura del Base64 XAI
+                    updatedQueue[i].scoreCam = data.visual_payloads.score_cam_url;
                     updatedQueue[i].positivityIndex = data.analytics.positivity_index_percentage;
                     updatedQueue[i].riskLevel = data.clinical_risk.level;
                     updatedQueue[i].riskColor = data.clinical_risk.color_code;
                 } else {
                     updatedQueue[i].status = "error";
+                    updatedQueue[i].errorDetail = "Respuesta incompleta del servidor.";
                 }
-            } catch (err) {
+            } catch (err: any) {
                 console.error(err);
                 updatedQueue[i].status = "error";
+                updatedQueue[i].errorDetail = err.message || "Error crítico de conexión.";
             }
 
             setQueue([...updatedQueue]);
@@ -186,19 +193,22 @@ export default function BulkUploadTab() {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                                 </svg>
                                 <p className="text-sm text-[#00539C] font-bold">Lote listo en memoria</p>
+                                <p className="text-xs text-gray-400 mt-2">Haz clic o arrastra para añadir más muestras</p>
                             </div>
                         ) : (
                             <div className="flex flex-col items-center justify-center">
-                                <svg className="h-10 w-10 mb-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg className={`h-10 w-10 mb-4 transition-colors ${isDragging ? 'text-[#00AEEF]' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                                 </svg>
-                                <p className="text-sm text-gray-600 font-medium">Arrastre las láminas o haga clic</p>
+                                <p className="text-sm text-gray-600 font-medium">
+                                    {isDragging ? 'Suelte las imágenes aquí' : 'Arrastre las láminas o haga clic para explorar'}
+                                </p>
+                                <p className="text-xs text-gray-400 mt-2">Formatos soportados: JPG, PNG, TIF, TIFF</p>
                             </div>
                         )}
                     </div>
 
                     <div className="space-y-2 mt-4">
-                        {/* REFACTORIZACIÓN DE TERMINOLOGÍA CLÍNICA UNIFICADA */}
                         <button
                             onClick={procesarLote}
                             disabled={isProcessing || queue.length === 0}
@@ -260,9 +270,14 @@ export default function BulkUploadTab() {
                                             Índice Pan-CK: {item.positivityIndex}% — {item.riskLevel}
                                         </p>
                                     )}
+                                    {/* MUESTRA LA ADVERTENCIA ESPECÍFICA ABAJO EN COLOR ROJO SI EL BACKEND RECHAZA EL ARCHIVO */}
+                                    {item.status === "error" && item.errorDetail && (
+                                        <p className="text-[11px] font-semibold mt-0.5 text-red-500">
+                                            ⚠️ {item.errorDetail}
+                                        </p>
+                                    )}
                                 </div>
 
-                                {/* MEJORA DE UX: ACCIÓN MÁS NATURAL Y COHERENTE */}
                                 <div className="flex items-center gap-4">
                                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
                                         item.status === "completado" ? "bg-green-50 text-green-700 border border-green-100" :
@@ -291,12 +306,11 @@ export default function BulkUploadTab() {
                 </div>
             </section>
 
-            {/* --- VISOR INTERACTIVO EN MODAL (MESA DE TRABAJO EN MINIATURA) --- */}
+            {/* --- VISOR INTERACTIVO EN MODAL --- */}
             {activeModalItem && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
                     <div className="bg-white rounded-xl shadow-2xl max-w-5xl w-full overflow-hidden border border-gray-100 flex flex-col">
 
-                        {/* SELECTOR DE PESTAÑAS INTEGRADO CON TRES VÍAS (HOMOLOGADO AL WORKSPACE) */}
                         <header className="bg-[#00539C] px-6 pt-3 flex justify-between items-end border-b-2 border-[#004380]">
                             <div className="flex items-end gap-1">
                                 <button
@@ -332,10 +346,8 @@ export default function BulkUploadTab() {
                             </button>
                         </header>
 
-                        {/* Cuerpo del Visor con Imagen Conmutada y Métricas del Archivo */}
                         <div className="bg-gray-100 p-6 flex flex-col md:flex-row gap-6 items-stretch justify-center max-h-[550px] overflow-y-auto">
 
-                            {/* Lienzo de Renderizado Conmutado */}
                             <div className="flex-1 flex items-center justify-center bg-[#E2E8F0] rounded-xl border border-gray-200 p-2 min-h-[380px] relative overflow-hidden">
                                 <img
                                     src={
@@ -350,7 +362,6 @@ export default function BulkUploadTab() {
                                 />
                             </div>
 
-                            {/* Tarjeta de Reporte Lateral por Archivo */}
                             <div className="w-full md:w-72 space-y-4 text-sm bg-white p-5 rounded-xl border border-gray-200 flex flex-col justify-between">
                                 <div className="space-y-4">
                                     <div>

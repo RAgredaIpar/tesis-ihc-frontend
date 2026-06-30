@@ -30,7 +30,7 @@ interface QuantifyResponse {
     visual_payloads: {
         synthetic_ihc_url: string;
         audit_canvas_url: string;
-        score_cam_url: string; // <-- NUEVO: Canal para recibir la matriz XAI interpretada
+        score_cam_url: string; // Canal para recibir la matriz XAI interpretada
     };
 }
 
@@ -52,14 +52,15 @@ export default function WorkspaceTab() {
 
     const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-    const handleFile = (selectedFile: File) => {
+    // Modificado para retornar boolean y solucionar el error de TypeScript TS2322
+    const handleFile = (selectedFile: File): boolean => {
         const extensionesPermitidas = [".png", ".jpg", ".jpeg", ".tif", ".tiff"];
         const nombreMinuscula = selectedFile.name.toLowerCase();
         const esValido = extensionesPermitidas.some((ext) => nombreMinuscula.endsWith(ext));
 
         if (!esValido) {
             alert("⚠️ Muestra digital rechazada. El sistema solo admite archivos de imagen médica en formato .png, .jpg, .jpeg, .tif o .tiff.");
-            return;
+            return false; // Frena la animación en UploadZone
         }
 
         setFile(selectedFile);
@@ -72,6 +73,8 @@ export default function WorkspaceTab() {
         img.onload = () => {
             setMetrics({ ...metrics, resolution: `${img.width}x${img.height} px`, status: "Lista para análisis" });
         };
+
+        return true; // Autentica el archivo y activa el check en UploadZone
     };
 
     const procesarLamina = async () => {
@@ -92,7 +95,11 @@ export default function WorkspaceTab() {
                 }
             });
 
-            if (!response.ok) throw new Error("Error en la inferencia del pipeline local");
+            // MANEJO DE ERRORES AVANZADO: Extrae la razón exacta (detail) del error del backend
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || "Error en la inferencia del pipeline local");
+            }
 
             const data: QuantifyResponse = await response.json();
             const endTime = performance.now();
@@ -105,9 +112,10 @@ export default function WorkspaceTab() {
                 status: "Completado"
             }));
 
-        } catch (error) {
+        } catch (error: any) {
             console.error(error);
-            setMetrics(prev => ({ ...prev, status: "Error de conexión" }));
+            // Captura el mensaje específico (ej: "Firma cromática no detectada") y lo guarda en las métricas
+            setMetrics(prev => ({ ...prev, status: error.message || "Error de conexión" }));
         } finally {
             setLoading(false);
         }
@@ -159,7 +167,14 @@ export default function WorkspaceTab() {
                         </li>
                         <li className="flex justify-between items-center">
                             <span className="text-gray-500">Estado</span>
-                            <span className={`text-xs font-bold px-2 py-1 rounded ${metrics.status === 'Completado' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                            {/* UX OPTIMIZADA: Si el estado contiene palabras de error, el badge se pinta de rojo */}
+                            <span className={`text-xs font-bold px-2 py-1 rounded max-w-[180px] truncate ${
+                                metrics.status === 'Completado'
+                                    ? 'bg-green-100 text-green-700'
+                                    : metrics.status.includes('Error') || metrics.status.includes('inválida') || metrics.status.includes('rechazada')
+                                        ? 'bg-red-100 text-red-700'
+                                        : 'bg-gray-100 text-gray-600'
+                            }`}>
                                 {metrics.status}
                             </span>
                         </li>
@@ -190,7 +205,6 @@ export default function WorkspaceTab() {
                             >
                                 Auditoría HSV
                             </button>
-                            {/* NUEVO BOTÓN: INTERFAZ DE EXPLICABILIDAD PARA TESIS */}
                             <button
                                 onClick={() => setActiveViewTab("Score-CAM")}
                                 className={`px-5 py-2.5 text-sm font-bold tracking-wide rounded-t-lg transition-colors ${

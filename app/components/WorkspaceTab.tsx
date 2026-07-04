@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import {useState} from "react";
 import UploadZone from "@/app/components/UploadZone";
 
 interface Metrics {
@@ -71,7 +71,7 @@ export default function WorkspaceTab() {
         const img = new Image();
         img.src = URL.createObjectURL(selectedFile);
         img.onload = () => {
-            setMetrics({ ...metrics, resolution: `${img.width}x${img.height} px`, status: "Lista para análisis" });
+            setMetrics({...metrics, resolution: `${img.width}x${img.height} px`, status: "Lista para análisis"});
         };
 
         return true; // Autentica el archivo y activa el check en UploadZone
@@ -80,7 +80,7 @@ export default function WorkspaceTab() {
     const procesarLamina = async () => {
         if (!file) return;
         setLoading(true);
-        setMetrics(prev => ({ ...prev, status: "Procesando en GPU..." }));
+        setMetrics(prev => ({...prev, status: "Procesando en GPU..."}));
 
         const startTime = performance.now();
         const formData = new FormData();
@@ -115,7 +115,7 @@ export default function WorkspaceTab() {
         } catch (error: any) {
             console.error(error);
             // Captura el mensaje específico (ej: "Firma cromática no detectada") y lo guarda en las métricas
-            setMetrics(prev => ({ ...prev, status: error.message || "Error de conexión" }));
+            setMetrics(prev => ({...prev, status: error.message || "Error de conexión"}));
         } finally {
             setLoading(false);
         }
@@ -136,7 +136,7 @@ export default function WorkspaceTab() {
             {/* COLUMNA IZQUIERDA: CONTROLES Y MÉTRICAS */}
             <aside className="lg:col-span-4 flex flex-col gap-6">
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                    <UploadZone onFileSelect={handleFile} loading={loading} />
+                    <UploadZone onFileSelect={handleFile} loading={loading}/>
                     <button
                         onClick={procesarLamina}
                         disabled={loading || !file}
@@ -167,7 +167,6 @@ export default function WorkspaceTab() {
                         </li>
                         <li className="flex justify-between items-center">
                             <span className="text-gray-500">Estado</span>
-                            {/* UX OPTIMIZADA: Si el estado contiene palabras de error, el badge se pinta de rojo */}
                             <span className={`text-xs font-bold px-2 py-1 rounded max-w-[180px] truncate ${
                                 metrics.status === 'Completado'
                                     ? 'bg-green-100 text-green-700'
@@ -175,7 +174,9 @@ export default function WorkspaceTab() {
                                         ? 'bg-red-100 text-red-700'
                                         : 'bg-gray-100 text-gray-600'
                             }`}>
-                                {metrics.status}
+                                {metrics.status.includes('Error') || metrics.status.includes('inválida') || metrics.status.includes('rechazada')
+                                    ? 'Muestra denegada'
+                                    : metrics.status}
                             </span>
                         </li>
                     </ul>
@@ -225,8 +226,10 @@ export default function WorkspaceTab() {
                     <div className="bg-[#E2E8F0] h-[500px] flex items-center justify-center relative overflow-hidden">
                         {loading ? (
                             <div className="flex flex-col items-center gap-3">
-                                <div className="w-12 h-12 border-4 border-gray-300 border-t-[#00539C] rounded-full animate-spin"></div>
-                                <span className="text-sm font-bold text-[#00539C] uppercase tracking-widest animate-pulse">Sintetizando y analizando matrices...</span>
+                                <div
+                                    className="w-12 h-12 border-4 border-gray-300 border-t-[#00539C] rounded-full animate-spin"></div>
+                                <span
+                                    className="text-sm font-bold text-[#00539C] uppercase tracking-widest animate-pulse">Sintetizando y analizando matrices...</span>
                             </div>
                         ) : currentResultImage ? (
                             <img
@@ -237,8 +240,10 @@ export default function WorkspaceTab() {
                             />
                         ) : (
                             <div className="text-gray-400 flex flex-col items-center gap-3">
-                                <svg className="w-12 h-12 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                <svg className="w-12 h-12 opacity-50" fill="none" viewBox="0 0 24 24"
+                                     stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
+                                          d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                                 </svg>
                                 <span className="text-sm uppercase tracking-widest font-medium">Visor Inactivo - Ejecute el Diagnóstico</span>
                             </div>
@@ -250,11 +255,13 @@ export default function WorkspaceTab() {
                 {apiResult && (
                     <div
                         className="bg-white p-6 rounded-xl shadow-sm border-t-4 transition-all grid grid-cols-1 md:grid-cols-3 gap-6"
-                        style={{ borderTopColor: apiResult.clinical_risk.color_code }}
+                        style={{borderTopColor: apiResult.clinical_risk.color_code}}
                     >
-                        <div className="md:col-span-1 border-b md:border-b-0 md:border-r pb-4 md:pb-0 md:pr-4 flex flex-col justify-center">
+                        <div
+                            className="md:col-span-1 border-b md:border-b-0 md:border-r pb-4 md:pb-0 md:pr-4 flex flex-col justify-center">
                             <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Riesgo Proliferativo</span>
-                            <h4 className="text-2xl font-black mt-0.5" style={{ color: apiResult.clinical_risk.color_code }}>
+                            <h4 className="text-2xl font-black mt-0.5"
+                                style={{color: apiResult.clinical_risk.color_code}}>
                                 {apiResult.clinical_risk.level}
                             </h4>
                             <div className="mt-4">
@@ -295,7 +302,8 @@ export default function WorkspaceTab() {
                         </h3>
                     </div>
 
-                    <div className="h-64 w-full bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden relative group">
+                    <div
+                        className="h-64 w-full bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden relative group">
                         {preview ? (
                             <img
                                 src={preview}

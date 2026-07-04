@@ -270,10 +270,9 @@ export default function BulkUploadTab() {
                                             Índice Pan-CK: {item.positivityIndex}% — {item.riskLevel}
                                         </p>
                                     )}
-                                    {/* MUESTRA LA ADVERTENCIA ESPECÍFICA ABAJO EN COLOR ROJO SI EL BACKEND RECHAZA EL ARCHIVO */}
-                                    {item.status === "error" && item.errorDetail && (
+                                    {item.status === "error" && (
                                         <p className="text-[11px] font-semibold mt-0.5 text-red-500">
-                                            ⚠️ {item.errorDetail}
+                                            ⚠️ Muestra denegada
                                         </p>
                                     )}
                                 </div>

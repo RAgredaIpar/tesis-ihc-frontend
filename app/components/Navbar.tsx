@@ -11,7 +11,7 @@ export default function Navbar({ serverStatus = "conectando" }: NavbarProps) {
     const [email, setEmail] = useState<string>("");
     const [role, setRole] = useState<string>("");
     const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
-    const [newPassword, setNewPassword] = useState<string>( oppression => "");
+    const [newPassword, setNewPassword] = useState<string>("");
     const [confirmPassword, setConfirmPassword] = useState<string>("");
     const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
     const [isSubmitting, setIsSubmitting] = useState<boolean>(false);

@@ -1,7 +1,9 @@
 "use client";
 
-import {useState} from "react";
+import { useState } from "react";
+import { supabase } from "@/lib/supabase"; // 🎯 Inyección de persistencia para la Fase 3
 import UploadZone from "@/app/components/UploadZone";
+import {guardarDiagnostico} from "@/app/actions/auth";
 
 interface Metrics {
     time: string;
@@ -112,9 +114,25 @@ export default function WorkspaceTab() {
                 status: "Completado"
             }));
 
+            try {
+                const resGuardado = await guardarDiagnostico({
+                    request_id: data.metadata.request_id,
+                    nombre_archivo: data.metadata.original_filename,
+                    total_nuclei: data.analytics.total_nuclei_detected,
+                    positive_nuclei: data.analytics.positive_nuclei_count,
+                    positivity_index: data.analytics.positivity_index_percentage,
+                    risk_level: data.clinical_risk.level
+                });
+
+                if (!resGuardado.success) {
+                    console.error("Fallo detectado en Server Action:", resGuardado.error);
+                }
+            } catch (dbErr: any) {
+                console.error("Fallo al invocar la Server Action de persistencia:", dbErr.message);
+            }
+
         } catch (error: any) {
             console.error(error);
-            // Captura el mensaje específico (ej: "Firma cromática no detectada") y lo guarda en las métricas
             setMetrics(prev => ({...prev, status: error.message || "Error de conexión"}));
         } finally {
             setLoading(false);

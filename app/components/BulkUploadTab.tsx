@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, DragEvent, ChangeEvent } from "react";
+import { supabase } from "@/lib/supabase";
+import {guardarDiagnostico} from "@/app/actions/auth"; // 🎯 Inyección de persistencia para almacenamiento en lote
 
 interface QueueItem {
     id: number;
@@ -95,6 +97,15 @@ export default function BulkUploadTab() {
         setIsProcessing(true);
         const updatedQueue = [...queue];
 
+        // Obtener el usuario logueado una sola vez antes de arrancar el lote para no saturar la API
+        let currentUserId: string | null = null;
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) currentUserId = user.id;
+        } catch (err) {
+            console.error("⚠️ No se pudo verificar la sesión médica para el lote:", err);
+        }
+
         for (let i = 0; i < updatedQueue.length; i++) {
             if (updatedQueue[i].status === "completado" || updatedQueue[i].status === "error") continue;
 
@@ -113,7 +124,6 @@ export default function BulkUploadTab() {
                     }
                 });
 
-                // Captura el error estructurado del backend (ej: el filtro espectral 422)
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({}));
                     throw new Error(errorData.detail || "Error en el procesamiento analítico local.");
@@ -129,6 +139,24 @@ export default function BulkUploadTab() {
                     updatedQueue[i].positivityIndex = data.analytics.positivity_index_percentage;
                     updatedQueue[i].riskLevel = data.clinical_risk.level;
                     updatedQueue[i].riskColor = data.clinical_risk.color_code;
+
+                    try {
+                        const resLote = await guardarDiagnostico({
+                            request_id: data.metadata.request_id,
+                            nombre_archivo: data.metadata.original_filename,
+                            total_nuclei: data.analytics.total_nuclei_detected,
+                            positive_nuclei: data.analytics.positive_nuclei_count,
+                            positivity_index: data.analytics.positivity_index_percentage,
+                            risk_level: data.clinical_risk.level
+                        });
+
+                        if (resLote.success) {
+                            console.log(`Muestra [${updatedQueue[i].name}] confirmada en el servidor.`);
+                        }
+                    } catch (dbErr: any) {
+                        console.error("Error al despachar ítem del lote al servidor:", dbErr.message);
+                    }
+
                 } else {
                     updatedQueue[i].status = "error";
                     updatedQueue[i].errorDetail = "Respuesta incompleta del servidor.";

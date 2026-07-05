@@ -1,13 +1,14 @@
 "use client";
 
-type TabType = "workspace" | "metrics" | "bulk" | "history" | "docs";
+export type TabType = "workspace" | "metrics" | "bulk" | "history" | "docs" | "admin";
 
 interface SidebarProps {
     activeTab: TabType;
     setActiveTab: (tab: TabType) => void;
+    role?: "admin" | "patologo";
 }
 
-export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
+export default function Sidebar({ activeTab, setActiveTab, role = "patologo" }: SidebarProps) {
     const menuItems = [
         {
             id: "workspace" as TabType,
@@ -56,6 +57,19 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
         },
     ];
 
+    // 🎯 Si el rol es administrador, inyectamos dinámicamente la pestaña de control de usuarios
+    if (role === "admin") {
+        menuItems.push({
+            id: "admin" as TabType,
+            label: "Gestión de Usuarios",
+            icon: (
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+            ),
+        });
+    }
+
     return (
         <aside className="w-64 bg-white border-r border-gray-200 h-full shadow-sm flex flex-col justify-between">
             <div className="p-4 space-y-1">
@@ -74,9 +88,9 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
                                     : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
                             }`}
                         >
-              <span className={isActive ? "text-white" : "text-gray-400"}>
-                {item.icon}
-              </span>
+                            <span className={isActive ? "text-white" : "text-gray-400"}>
+                                {item.icon}
+                            </span>
                             {item.label}
                         </button>
                     );

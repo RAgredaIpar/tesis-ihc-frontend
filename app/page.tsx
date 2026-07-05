@@ -1,71 +1,79 @@
-"use client";
+import { loginUsuario } from './actions/auth';
 
-import { useState, useEffect } from "react";
-import Navbar from "@/app/components/Navbar";
-import Sidebar from "@/app/components/Sidebar";
-import WorkspaceTab from "@/app/components/WorkspaceTab";
-import MetricsTab from "@/app/components/MetricsTab";
-import BulkUploadTab from "@/app/components/BulkUploadTab";
-import HistoryTab from "@/app/components/HistoryTab";
-import DocsTab from "@/app/components/DocsTab";
-
-type TabType = "workspace" | "metrics" | "bulk" | "history" | "docs";
-
-export default function Dashboard() {
-    const [currentTab, setCurrentTab] = useState<TabType>("workspace");
-    const [serverState, setServerState] = useState<"conectando" | "activo" | "inactivo">("conectando");
-
-    useEffect(() => {
-        const checkServer = async () => {
-            try {
-                // 1. Jalamos la URL de Vercel (Ngrok) o usamos localhost por defecto en local
-                const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
-                // 2. Agregamos el header para saltar la advertencia de Ngrok en el Health Check
-                const res = await fetch(`${baseUrl}/api/health`, {
-                    headers: {
-                        "ngrok-skip-browser-warning": "true"
-                    }
-                });
-
-                const data = await res.json();
-
-                if (res.ok && data.status === "online") {
-                    setServerState("activo");
-                } else {
-                    setServerState("inactivo");
-                }
-            } catch (error) {
-                setServerState("inactivo");
-            }
-        };
-        checkServer();
-    }, []);
-
+export default function LoginPage() {
     return (
-        <div className="h-screen bg-[#F8FAFC] font-sans text-gray-800 flex flex-col overflow-hidden">
-            <style>{`
-                @keyframes fadeSlide {
-                    from { opacity: 0; transform: translateY(5px); }
-                    to { opacity: 1; transform: translateY(0); }
-                }
-                .animate-fade-slide {
-                    animation: fadeSlide 0.3s ease-out forwards;
-                }
-            `}</style>
+        <div className="min-h-screen flex items-center justify-center bg-slate-100 px-4">
+            <div className="max-w-md w-full space-y-6 bg-white p-8 rounded-xl shadow-xl border border-slate-200">
 
-            <Navbar serverStatus={serverState} />
+                {/* Identidad Institucional de EsSalud */}
+                <div className="flex flex-col items-center text-center">
+                    <div className="mb-4 h-16 w-auto flex items-center justify-center">
+                        <img
+                            src="/Logo_EsSalud.png"
+                            alt="Logo EsSalud"
+                            className="h-full w-auto object-contain"
+                        />
+                    </div>
 
-            <div className="flex flex-1 overflow-hidden">
-                <Sidebar activeTab={currentTab} setActiveTab={setCurrentTab} />
+                    <div className="h-[2px] w-16 bg-[#0070C0] mb-4"></div>
 
-                <div className="flex-1 p-6 overflow-y-auto h-full bg-[#F8FAFC]">
-                    {currentTab === "workspace" && <WorkspaceTab />}
-                    {currentTab === "metrics" && <MetricsTab />}
-                    {currentTab === "bulk" && <BulkUploadTab />}
-                    {currentTab === "history" && <HistoryTab />}
-                    {currentTab === "docs" && <DocsTab />}
+                    <h2 className="text-2xl font-bold text-[#003366] tracking-tight">
+                        Sistema de Patología Digital
+                    </h2>
+                    <p className="mt-1 text-xs font-medium text-slate-500 uppercase tracking-widest">
+                        Cuantificación Pan-CK Automatizada
+                    </p>
                 </div>
+
+                {/* Formulario de Admisión Clínico - 🎯 CORREGIDO CON AS ANY PARA EVITAR EL ERROR DE SERIALIZACIÓN */}
+                <form action={loginUsuario as any} className="mt-6 space-y-5">
+                    <div className="space-y-4">
+                        <div>
+                            <label htmlFor="email" className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                                Correo Institucional
+                            </label>
+                            <input
+                                id="email"
+                                name="email"
+                                type="email"
+                                required
+                                className="appearance-none block w-full px-3 py-2.5 border border-slate-300 placeholder-slate-400 text-slate-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0070C0] focus:border-[#0070C0] text-sm bg-slate-50"
+                                placeholder="usuario@essalud.gob.pe"
+                            />
+                        </div>
+
+                        <div>
+                            <label htmlFor="password" className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                                Contraseña de Sistema
+                            </label>
+                            <input
+                                id="password"
+                                name="password"
+                                type="password"
+                                required
+                                className="appearance-none block w-full px-3 py-2.5 border border-slate-300 placeholder-slate-400 text-slate-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0070C0] focus:border-[#0070C0] text-sm bg-slate-50"
+                                placeholder="••••••••"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="pt-2">
+                        <button
+                            type="submit"
+                            className="w-full flex justify-center py-2.5 px-4 border border-transparent text-sm font-bold rounded-lg text-white bg-[#003366] hover:bg-[#002244] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0070C0] transition-colors shadow-md uppercase tracking-wider"
+                        >
+                            Iniciar Sesión Médica
+                        </button>
+                    </div>
+                </form>
+
+                {/* Pie de seguridad corporativo */}
+                <div className="text-center pt-2">
+                    <p className="text-[10px] text-slate-400">
+                        Este sistema procesa datos clínicos confidenciales. El acceso no autorizado está estrictamente auditado.
+                    </p>
+                </div>
+
             </div>
         </div>
     );

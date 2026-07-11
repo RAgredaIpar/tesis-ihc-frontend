@@ -1,6 +1,13 @@
+'use client';
+
+import { useActionState } from 'react';
 import { loginUsuario } from './actions/auth';
 
 export default function LoginPage() {
+    // Inicializamos el estado del formulario.
+    // loginUsuario ahora es una función compatible con useActionState.
+    const [state, action, isPending] = useActionState(loginUsuario, null);
+
     return (
         <div className="min-h-screen flex items-center justify-center bg-slate-100 px-4">
             <div className="max-w-md w-full space-y-6 bg-white p-8 rounded-xl shadow-xl border border-slate-200">
@@ -25,8 +32,16 @@ export default function LoginPage() {
                     </p>
                 </div>
 
-                {/* Formulario de Admisión Clínico - 🎯 CORREGIDO CON AS ANY PARA EVITAR EL ERROR DE SERIALIZACIÓN */}
-                <form action={loginUsuario as any} className="mt-6 space-y-5">
+                {/* Formulario de Admisión Clínico */}
+                <form action={action} className="mt-6 space-y-5">
+
+                    {/* Alerta de error si el estado devuelve un mensaje de error */}
+                    {state?.error && (
+                        <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs font-bold rounded-lg text-center animate-in fade-in">
+                            {state.error}
+                        </div>
+                    )}
+
                     <div className="space-y-4">
                         <div>
                             <label htmlFor="email" className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
@@ -60,9 +75,10 @@ export default function LoginPage() {
                     <div className="pt-2">
                         <button
                             type="submit"
-                            className="w-full flex justify-center py-2.5 px-4 border border-transparent text-sm font-bold rounded-lg text-white bg-[#003366] hover:bg-[#002244] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0070C0] transition-colors shadow-md uppercase tracking-wider"
+                            disabled={isPending}
+                            className="w-full flex justify-center py-2.5 px-4 border border-transparent text-sm font-bold rounded-lg text-white bg-[#003366] hover:bg-[#002244] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0070C0] transition-colors shadow-md uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            Iniciar Sesión Médica
+                            {isPending ? 'Validando Acceso...' : 'Iniciar Sesión Médica'}
                         </button>
                     </div>
                 </form>

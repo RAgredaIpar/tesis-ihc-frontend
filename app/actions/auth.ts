@@ -5,9 +5,9 @@ import { redirect } from 'next/navigation';
 import { supabase, getSupabaseAdmin } from '@/lib/supabase';
 
 /**
- * 1. INICIAR SESIÓN (Maneja tokens y guarda cookies de forma automática)
+ * 1. INICIAR SESIÓN (Actualizado para useActionState)
  */
-export async function loginUsuario(formData: FormData) {
+export async function loginUsuario(prevState: any, formData: FormData) {
     const email = formData.get('email') as string;
     const password = formData.get('password') as string;
 
@@ -17,11 +17,11 @@ export async function loginUsuario(formData: FormData) {
 
     if (error) {
         console.error(`[AUTH ERROR] Supabase rechazó el inicio de sesión: ${error.message}`);
-        return { success: false, error: error.message };
+        // Retornamos el objeto para que 'state' en el componente lo capture
+        return { success: false, error: "Credenciales incorrectas. Verifique su acceso." };
     }
 
     console.log(`[AUTH SUCCESS] Token generado para UUID: ${data.user.id}`);
-    console.log(`[DB] Extrayendo rol asignado desde la tabla pública 'perfiles'...`);
 
     const { data: perfil, error: perfilError } = await supabase
         .from('perfiles')
@@ -30,18 +30,15 @@ export async function loginUsuario(formData: FormData) {
         .single();
 
     if (perfilError) {
-        console.error(`[DB ERROR] No se encontró la fila del usuario en la tabla 'perfiles': ${perfilError.message}`);
-        return { success: false, error: perfilError.message };
+        console.error(`[DB ERROR] Perfil no encontrado: ${perfilError.message}`);
+        return { success: false, error: "Error al recuperar perfil institucional." };
     }
-
-    console.log(`[DB SUCCESS] Perfil clínico localizado. Rango detectado: ${perfil?.rol}`);
 
     const cookieStore = await cookies();
     cookieStore.set('user_role', perfil?.rol || 'patologo', { path: '/' });
     cookieStore.set('sb_session', data.session.access_token, { path: '/' });
 
-    console.log(`[COOKIE SET] Sesión inyectada en el navegador. Redirigiendo a /workspace...\n`);
-
+    // La redirección no necesita retornar nada al cliente
     redirect('/workspace');
 }
 
@@ -59,7 +56,7 @@ export async function logoutUsuario() {
 }
 
 /**
- * 3. CAMBIO DE CONTRASEÑA (Para el usuario logueado actualmente)
+ * 3. CAMBIO DE CONTRASEÑA
  */
 export async function cambiarPassword(formData: FormData) {
     const newPassword = formData.get('new_password') as string;
@@ -75,7 +72,7 @@ export async function cambiarPassword(formData: FormData) {
 }
 
 /**
- * 4. FLUJO DE ADMINISTRADOR: Crear una nueva cuenta de Patólogo sin cerrar sesión
+ * 4. FLUJO DE ADMINISTRADOR
  */
 export async function adminCrearPatologo(formData: FormData) {
     const email = formData.get('email') as string;
@@ -110,7 +107,7 @@ export async function adminCrearPatologo(formData: FormData) {
 }
 
 /**
- * 5. PERSISTENCIA CONTROLADA: Registrar reportes moleculares desde el entorno del servidor
+ * 5. PERSISTENCIA CONTROLADA
  */
 export async function guardarDiagnostico(diagnostico: {
     request_id: string;
@@ -125,43 +122,25 @@ export async function guardarDiagnostico(diagnostico: {
         const sessionToken = cookieStore.get('sb_session')?.value;
 
         if (!sessionToken) {
-            console.error("[DB ERROR] Petición rechazada de persistencia: No existe token activo en cookies.");
             return { success: false, error: "Sesión de usuario no localizada." };
         }
 
         const { data: { user }, error: authError } = await supabase.auth.getUser(sessionToken);
 
         if (authError || !user) {
-            console.error("[DB ERROR] Token de sesión inválido o expirado en el servidor.");
             return { success: false, error: "Credenciales de sesión no válidas." };
         }
 
-        console.log(`[DB] Procesando inserción de diagnóstico clínico para el usuario: ${user.id}`);
-
         const { error: dbError } = await supabase
             .from("historial_diagnosticos")
-            .insert([
-                {
-                    request_id: diagnostico.request_id,
-                    nombre_archivo: diagnostico.nombre_archivo,
-                    total_nuclei: diagnostico.total_nuclei,
-                    positive_nuclei: diagnostico.positive_nuclei,
-                    positivity_index: diagnostico.positivity_index,
-                    risk_level: diagnostico.risk_level,
-                    usuario_id: user.id
-                }
-            ]);
+            .insert([{ ...diagnostico, usuario_id: user.id }]);
 
-        if (dbError) {
-            console.error(`[DB ERROR] Error crítico de inserción en la tabla historial_diagnosticos: ${dbError.message}`);
-            return { success: false, error: dbError.message };
-        }
+        if (dbError) return { success: false, error: dbError.message };
 
-        console.log(`[DB SUCCESS] Registro almacenado correctamente en el archivo digital: ${diagnostico.nombre_archivo}`);
         return { success: true };
 
     } catch (err: any) {
-        console.error("[SERVER ERROR] Excepción detectada en guardarDiagnostico:", err.message);
+        console.error("[SERVER ERROR] Excepción en guardarDiagnostico:", err.message);
         return { success: false, error: err.message };
     }
 }

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { supabase } from '@/lib/supabase';
+import { obtenerHistorial } from '@/app/actions/auth';
 import { HistoryRecord } from '@/lib/types';
 
 interface DatabaseHistoryRow {
@@ -27,21 +27,14 @@ export default function HistoryTab() {
         const cargarHistorial = async () => {
             setLoading(true);
             try {
-                const { data, error } = await supabase
-                    .from('historial_diagnosticos')
-                    .select('*');
+                const res = await obtenerHistorial();
+                if (!res.success) {
+                    throw new Error(res.error || 'Fallo al recuperar registros');
+                }
 
-                if (error) throw error;
-
-                if (data) {
-                    const typedData = data as unknown as DatabaseHistoryRow[];
-                    const sortedData = [...typedData].sort((a, b) => {
-                        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
-                        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
-                        return dateB - dateA;
-                    });
-
-                    const mapped: HistoryRecord[] = sortedData.map((item) => ({
+                if (res.data) {
+                    const typedData = res.data as unknown as DatabaseHistoryRow[];
+                    const mapped: HistoryRecord[] = typedData.map((item) => ({
                         id: item.request_id,
                         request_id: item.request_id,
                         nombre_archivo: item.nombre_archivo,

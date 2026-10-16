@@ -1,51 +1,63 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import Navbar from "@/app/components/Navbar";
-import Sidebar, { TabType } from "@/app/components/Sidebar";
-import WorkspaceTab from "@/app/components/WorkspaceTab";
-import MetricsTab from "@/app/components/MetricsTab";
-import BulkUploadTab from "@/app/components/BulkUploadTab";
-import HistoryTab from "@/app/components/HistoryTab";
-import DocsTab from "@/app/components/DocsTab";
-import AdminTab from "@/app/components/AdminTab";
+import { useState, useEffect } from 'react';
+import Navbar from '@/app/components/Navbar';
+import Sidebar, { TabType } from '@/app/components/Sidebar';
+import WorkspaceTab from '@/app/components/WorkspaceTab';
+import MetricsTab from '@/app/components/MetricsTab';
+import BulkUploadTab from '@/app/components/BulkUploadTab';
+import HistoryTab from '@/app/components/HistoryTab';
+import DocsTab from '@/app/components/DocsTab';
+import AdminTab from '@/app/components/AdminTab';
+import { HealthResponse } from '@/lib/types';
 
+/**
+ * Contenedor principal de la estación de trabajo histopatológica.
+ * Gestiona la navegación de pestañas y la sincronización con el servidor de inferencia.
+ */
 export default function WorkspacePage() {
-    const [currentTab, setCurrentTab] = useState<TabType>("workspace");
-    const [serverState, setServerState] = useState<"conectando" | "activo" | "inactivo">("conectando");
-    const [userRole, setUserRole] = useState<"admin" | "patologo">("patologo");
+    const [currentTab, setCurrentTab] = useState<TabType>('workspace');
+    const [serverState, setServerState] = useState<'conectando' | 'activo' | 'inactivo'>('conectando');
+    const [userRole, setUserRole] = useState<'admin' | 'patologo'>('patologo');
 
     useEffect(() => {
-        // A. Verificar estado de tu backend en FastAPI
-        const checkServer = async () => {
-            try {
-                const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-                const res = await fetch(`${baseUrl}/api/health`, {
-                    headers: {
-                        "ngrok-skip-browser-warning": "true"
-                    }
-                });
-                const data = await res.json();
-                if (res.ok && data.status === "online") {
-                    setServerState("activo");
-                } else {
-                    setServerState("inactivo");
-                }
-            } catch (error) {
-                setServerState("inactivo");
-            }
-        };
+        let isMounted = true;
 
-        // 🎯 B. CORREGIDO: Extraer el rol directamente de la cookie del navegador (Evita desync con Supabase)
-        const fetchUserRoleFromCookie = () => {
+        const inicializarEstacion = async () => {
             const match = document.cookie.match(new RegExp('(^| )user_role=([^;]+)'));
-            if (match && (match[2] === "admin" || match[2] === "patologo")) {
-                setUserRole(match[2] as "admin" | "patologo");
+            if (isMounted && match && (match[2] === 'admin' || match[2] === 'patologo')) {
+                setUserRole(match[2] as 'admin' | 'patologo');
+            }
+
+            try {
+                const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+                const response = await fetch(`${baseUrl}/api/health`, {
+                    headers: {
+                        'ngrok-skip-browser-warning': 'true',
+                    },
+                });
+
+                if (!response.ok) {
+                    if (isMounted) setServerState('inactivo');
+                    return;
+                }
+
+                const data: HealthResponse = await response.json();
+                if (isMounted) {
+                    setServerState(data.status === 'online' ? 'activo' : 'inactivo');
+                }
+            } catch {
+                if (isMounted) {
+                    setServerState('inactivo');
+                }
             }
         };
 
-        checkServer();
-        fetchUserRoleFromCookie();
+        void inicializarEstacion();
+
+        return () => {
+            isMounted = false;
+        };
     }, []);
 
     return (
@@ -65,14 +77,14 @@ export default function WorkspacePage() {
             <div className="flex flex-1 overflow-hidden">
                 <Sidebar activeTab={currentTab} setActiveTab={setCurrentTab} role={userRole} />
 
-                <div className="flex-1 p-6 overflow-y-auto h-full bg-[#F8FAFC]">
-                    {currentTab === "workspace" && <WorkspaceTab />}
-                    {currentTab === "metrics" && <MetricsTab />}
-                    {currentTab === "bulk" && <BulkUploadTab />}
-                    {currentTab === "history" && <HistoryTab />}
-                    {currentTab === "docs" && <DocsTab />}
-                    {currentTab === "admin" && <AdminTab />}
-                </div>
+                <main className="flex-1 p-6 overflow-y-auto h-full bg-[#F8FAFC]">
+                    {currentTab === 'workspace' && <WorkspaceTab />}
+                    {currentTab === 'metrics' && <MetricsTab />}
+                    {currentTab === 'bulk' && <BulkUploadTab />}
+                    {currentTab === 'history' && <HistoryTab />}
+                    {currentTab === 'docs' && <DocsTab />}
+                    {currentTab === 'admin' && <AdminTab />}
+                </main>
             </div>
         </div>
     );

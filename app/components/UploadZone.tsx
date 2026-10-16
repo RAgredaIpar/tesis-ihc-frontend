@@ -1,3 +1,5 @@
+'use client';
+
 import { ChangeEvent, DragEvent, useState } from 'react';
 
 interface UploadZoneProps {
@@ -5,6 +7,10 @@ interface UploadZoneProps {
     loading: boolean;
 }
 
+/**
+ * Componente de zona de carga de muestras digitales con soporte para arrastrar y soltar (Drag & Drop),
+ * exploracion de archivos y animaciones de confirmacion de recepcion.
+ */
 export default function UploadZone({ onFileSelect, loading }: UploadZoneProps) {
     const [isDragging, setIsDragging] = useState<boolean>(false);
     const [showCheck, setShowCheck] = useState<boolean>(false);
@@ -57,9 +63,11 @@ export default function UploadZone({ onFileSelect, loading }: UploadZoneProps) {
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
                 className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-all duration-300 ${
-                    isDragging ? 'border-[#00AEEF] bg-blue-50 scale-[1.02]' :
-                        hasFile && !showCheck ? 'border-[#00539C] bg-[#F4F9FD]' :
-                            'border-gray-300 bg-gray-50 hover:bg-gray-100'
+                    isDragging
+                        ? 'border-[#00AEEF] bg-blue-50 scale-[1.02]'
+                        : hasFile && !showCheck
+                          ? 'border-[#00539C] bg-[#F4F9FD]'
+                          : 'border-gray-300 bg-gray-50 hover:bg-gray-100'
                 }`}
             >
                 <input
@@ -73,12 +81,24 @@ export default function UploadZone({ onFileSelect, loading }: UploadZoneProps) {
                 {showCheck ? (
                     <div className="flex flex-col items-center justify-center">
                         <svg className="h-16 w-16 mb-2" viewBox="0 0 52 52">
-                            <circle className="stroke-green-500 fill-none" strokeWidth="4" strokeDasharray="160"
-                                    strokeDashoffset="160" cx="26" cy="26" r="24"
-                                    style={{ animation: "drawCircle 0.6s ease-out forwards" }} />
-                            <path className="stroke-green-500 fill-none" strokeWidth="4" strokeDasharray="50"
-                                  strokeDashoffset="50" d="M14.1 27.2l7.1 7.2 16.7-16.8"
-                                  style={{ animation: "drawCheck 0.4s ease-out 0.6s forwards" }} />
+                            <circle
+                                className="stroke-green-500 fill-none"
+                                strokeWidth="4"
+                                strokeDasharray="160"
+                                strokeDashoffset="160"
+                                cx="26"
+                                cy="26"
+                                r="24"
+                                style={{ animation: 'drawCircle 0.6s ease-out forwards' }}
+                            />
+                            <path
+                                className="stroke-green-500 fill-none"
+                                strokeWidth="4"
+                                strokeDasharray="50"
+                                strokeDashoffset="50"
+                                d="M14.1 27.2l7.1 7.2 16.7-16.8"
+                                style={{ animation: 'drawCheck 0.4s ease-out 0.6s forwards' }}
+                            />
                         </svg>
                         <p className="text-sm font-bold text-green-600">Lámina cargada</p>
                         <style>{`
@@ -88,26 +108,41 @@ export default function UploadZone({ onFileSelect, loading }: UploadZoneProps) {
                     </div>
                 ) : hasFile ? (
                     <div className="flex flex-col items-center justify-center">
-                        <svg className="h-10 w-10 text-[#00539C] mb-3 opacity-80" fill="none" viewBox="0 0 24 24"
-                             stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                        <svg
+                            className="h-10 w-10 text-[#00539C] mb-3 opacity-80"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={1.5}
+                                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+                            />
                         </svg>
                         <p className="text-sm text-[#00539C] font-bold">Muestra en memoria lista para análisis</p>
-                        <p className="text-xs text-gray-400 mt-2">Haz clic o arrastra para reemplazar la imagen</p>
+                        <p className="text-xs text-gray-400 mt-2">Haga clic o arrastre para reemplazar la imagen</p>
                     </div>
                 ) : (
                     <div className="flex flex-col items-center justify-center">
                         <svg
                             className={`h-10 w-10 mb-4 transition-colors ${isDragging ? 'text-[#00AEEF]' : 'text-gray-400'}`}
-                            fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={1.5}
+                                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                            />
                         </svg>
                         <p className="text-sm text-gray-600 font-medium">
                             {isDragging ? 'Suelte la imagen aquí' : 'Arrastre la lámina o haga clic para explorar'}
                         </p>
-                        <p className="text-xs text-gray-400 mt-2">Formatos soportados: JPG, PNG, TIF, TIFF</p>
+                        <p className="text-xs text-gray-400 mt-2">Formatos admitidos: PNG, JPG, JPEG, TIF, TIFF</p>
                     </div>
                 )}
             </div>
@@ -115,7 +150,7 @@ export default function UploadZone({ onFileSelect, loading }: UploadZoneProps) {
             {loading && (
                 <div className="mt-4">
                     <div className="flex justify-between text-xs font-bold text-[#00539C] mb-1 uppercase">
-                        <span>Ejecutando Inferencia IA...</span>
+                        <span>Ejecutando inferencia diagnóstica...</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden relative">
                         <div className="absolute top-0 bottom-0 left-0 w-full bg-gradient-to-r from-[#00AEEF] via-white to-[#00AEEF] animate-shimmer-bar opacity-80" />

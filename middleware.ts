@@ -1,23 +1,26 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+/**
+ * Middleware de seguridad para el control de acceso basado en sesiones y roles.
+ * Protege las rutas del espacio de trabajo y restringe accesos no autorizados.
+ */
 export function middleware(request: NextRequest) {
     const sessionToken = request.cookies.get('sb_session')?.value;
     const userRole = request.cookies.get('user_role')?.value;
-
     const { pathname } = request.nextUrl;
 
-    // 🎯 CORREGIDO: Si no hay sesión, rebota a la raíz '/' (donde está tu login)
+    // Redireccionar al inicio de sesion si no existe una sesion activa
     if (!sessionToken && (pathname.startsWith('/workspace') || pathname.startsWith('/admin'))) {
         return NextResponse.redirect(new URL('/', request.url));
     }
 
-    // Si un Patólogo intenta meterse por URL a /admin
+    // Restringir rutas administrativas a usuarios sin privilegios
     if (pathname.startsWith('/admin') && userRole !== 'admin') {
         return NextResponse.redirect(new URL('/workspace', request.url));
     }
 
-    // 🎯 CORREGIDO: Si ya está logueado e intenta ir al login ('/'), lo mandamos al workspace
+    // Redireccionar al espacio de trabajo si el usuario ya esta autenticado
     if (sessionToken && pathname === '/') {
         return NextResponse.redirect(new URL('/workspace', request.url));
     }
@@ -26,6 +29,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-    // 🎯 CORREGIDO: Escuchamos la raíz '/' en lugar de '/login'
     matcher: ['/workspace/:path*', '/admin/:path*', '/'],
 };

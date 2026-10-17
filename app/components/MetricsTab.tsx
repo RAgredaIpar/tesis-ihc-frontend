@@ -42,10 +42,16 @@ function AnimatedValue({ value, duration = 1200, decimals = 0, isLocale = false 
     return <>{current.toFixed(decimals)}</>;
 }
 
+import { CLINICAL_VALIDATION_50_PATCHES } from '@/lib/clinicalValidationData';
+
 /**
  * Pestaña de validacion estadistica, benchmarking comparativo y matrices de contingencia diagnóstica.
  */
 export default function MetricsTab() {
+    const [viewMode, setViewMode] = useState<'clinical' | 'computational'>('clinical');
+    const [clinicalFilter, setClinicalFilter] = useState<'all' | 'match' | 'discrepant'>('all');
+    const [searchQuery, setSearchQuery] = useState('');
+
     const benchmarkData = [
         {
             model: 'U-Net PRO (M2) - Propuesto',
@@ -63,6 +69,22 @@ export default function MetricsTab() {
         },
     ];
 
+    const filteredPatches = CLINICAL_VALIDATION_50_PATCHES.filter((item) => {
+        const matchesFilter =
+            clinicalFilter === 'all'
+                ? true
+                : clinicalFilter === 'match'
+                  ? item.clinicalMatch
+                  : !item.clinicalMatch;
+
+        const matchesSearch =
+            searchQuery.trim() === '' ||
+            item.fileName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            String(item.id).includes(searchQuery);
+
+        return matchesFilter && matchesSearch;
+    });
+
     return (
         <div className="max-w-7xl mx-auto space-y-6 animate-fade-slide">
             <style>{`
@@ -74,16 +96,333 @@ export default function MetricsTab() {
                 }
             `}</style>
 
-            <header className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                <h2 className="text-xl font-bold text-[#00539C] uppercase tracking-wide">
-                    Validación Estadística y Benchmarking Computacional
-                </h2>
-                <p className="text-gray-500 text-sm mt-1">
-                    Evaluación comparativa cuantitativa y análisis de concordancia diagnóstica entre la arquitectura propuesta y el estado del arte.
-                </p>
+            <header className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                    <h2 className="text-xl font-bold text-[#00539C] uppercase tracking-wide">
+                        Validación Clínica y Benchmarking Estadístico
+                    </h2>
+                    <p className="text-gray-500 text-sm mt-1">
+                        Estudio de concordancia diagnóstica a doble ciego con médicos especialistas y métricas comparativas de modelos.
+                    </p>
+                </div>
+
+                <div className="flex bg-gray-100 p-1 rounded-lg border border-gray-200 self-start md:self-auto">
+                    <button
+                        type="button"
+                        onClick={() => setViewMode('clinical')}
+                        className={`px-4 py-2 text-xs font-bold rounded-md transition-colors cursor-pointer ${
+                            viewMode === 'clinical'
+                                ? 'bg-white text-[#00539C] shadow-sm'
+                                : 'text-gray-600 hover:text-gray-900'
+                        }`}
+                    >
+                        Validación Patólogas (n=50)
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setViewMode('computational')}
+                        className={`px-4 py-2 text-xs font-bold rounded-md transition-colors cursor-pointer ${
+                            viewMode === 'computational'
+                                ? 'bg-white text-[#00539C] shadow-sm'
+                                : 'text-gray-600 hover:text-gray-900'
+                        }`}
+                    >
+                        Telemetría Computacional
+                    </button>
+                </div>
             </header>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {viewMode === 'clinical' ? (
+                <div className="space-y-6">
+                    {/* Tarjetas KPI de Concordancia Clinica */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="bg-white p-5 rounded-xl border border-blue-200 shadow-sm">
+                            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block">
+                                Concordancia Diagnóstica IA vs Consenso
+                            </span>
+                            <div className="mt-2 flex items-baseline gap-2">
+                                <span className="text-3xl font-black text-[#00539C] font-mono">
+                                    <AnimatedValue value={86.0} decimals={1} />%
+                                </span>
+                                <span className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded">
+                                    43 / 50 Parches
+                                </span>
+                            </div>
+                            <p className="text-[11px] text-gray-400 mt-2">
+                                Coincidencia clínica binaria según umbral de St. Gallen (15%).
+                            </p>
+                        </div>
+
+                        <div className="bg-white p-5 rounded-xl border border-indigo-200 shadow-sm">
+                            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block">
+                                Concordancia Inter-Patólogas
+                            </span>
+                            <div className="mt-2 flex items-baseline gap-2">
+                                <span className="text-3xl font-black text-indigo-700 font-mono">
+                                    <AnimatedValue value={88.0} decimals={1} />%
+                                </span>
+                                <span className="text-xs font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">
+                                    44 / 50 Parches
+                                </span>
+                            </div>
+                            <p className="text-[11px] text-gray-400 mt-2">
+                                Acuerdo entre Dra. Zaida (P1) y Dra. Patricia (P2).
+                            </p>
+                        </div>
+
+                        <div className="bg-white p-5 rounded-xl border border-green-200 shadow-sm">
+                            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block">
+                                Sensibilidad Clínica (Alta Proliferación)
+                            </span>
+                            <div className="mt-2 flex items-baseline gap-2">
+                                <span className="text-3xl font-black text-green-700 font-mono">
+                                    <AnimatedValue value={88.0} decimals={1} />%
+                                </span>
+                                <span className="text-xs font-semibold text-green-700 bg-green-50 px-2 py-0.5 rounded">
+                                    22 / 25 Casos
+                                </span>
+                            </div>
+                            <p className="text-[11px] text-gray-400 mt-2">
+                                Detección correcta de muestras con proliferación Ki-67 ≥ 15%.
+                            </p>
+                        </div>
+
+                        <div className="bg-white p-5 rounded-xl border border-emerald-200 shadow-sm">
+                            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block">
+                                Especificidad Clínica (Baja Proliferación)
+                            </span>
+                            <div className="mt-2 flex items-baseline gap-2">
+                                <span className="text-3xl font-black text-emerald-700 font-mono">
+                                    <AnimatedValue value={84.0} decimals={1} />%
+                                </span>
+                                <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
+                                    21 / 25 Casos
+                                </span>
+                            </div>
+                            <p className="text-[11px] text-gray-400 mt-2">
+                                Confirmación certera de muestras con proliferación Ki-67 &lt; 15%.
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Matriz 2x2 de Contingencia Clinica y Resumen del Estudio */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                        <div className="lg:col-span-6 bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col justify-between">
+                            <div>
+                                <h3 className="text-xs font-bold text-gray-700 uppercase tracking-widest mb-1">
+                                    Matriz de Concordancia Diagnóstica (Categorías Clínicas)
+                                </h3>
+                                <p className="text-xs text-gray-400 mb-6">
+                                    Correlación categórica binaria entre el Consenso Humano Gold Standard y el Dictamen de U-Net PRO.
+                                </p>
+                            </div>
+
+                            <div className="grid grid-cols-12 gap-2 text-center items-center">
+                                <div className="col-span-1 [writing-mode:vertical-lr] rotate-180 text-[10px] font-bold text-gray-400 uppercase tracking-widest justify-self-center">
+                                    Dictamen U-Net PRO
+                                </div>
+
+                                <div className="col-span-11 grid grid-cols-3 gap-2">
+                                    <div></div>
+                                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pb-1">
+                                        Consenso Alta (≥15%)
+                                    </div>
+                                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pb-1">
+                                        Consenso Baja (&lt;15%)
+                                    </div>
+
+                                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest self-center text-right pr-2">
+                                        IA Alta (≥15%)
+                                    </div>
+                                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                                        <p className="text-2xl font-black text-green-700 font-mono">22</p>
+                                        <p className="text-[9px] font-bold text-green-600 uppercase mt-1">Verdaderos Positivos</p>
+                                    </div>
+                                    <div className="bg-red-50 border border-red-100 rounded-lg p-4">
+                                        <p className="text-2xl font-black text-red-600 font-mono">4</p>
+                                        <p className="text-[9px] font-bold text-red-500 uppercase mt-1">Falsos Positivos</p>
+                                    </div>
+
+                                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest self-center text-right pr-2">
+                                        IA Baja (&lt;15%)
+                                    </div>
+                                    <div className="bg-amber-50 border border-amber-100 rounded-lg p-4">
+                                        <p className="text-2xl font-black text-amber-600 font-mono">3</p>
+                                        <p className="text-[9px] font-bold text-amber-500 uppercase mt-1">Falsos Negativos</p>
+                                    </div>
+                                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                        <p className="text-2xl font-black text-[#00539C] font-mono">21</p>
+                                        <p className="text-[9px] font-bold text-blue-600 uppercase mt-1">Verdaderos Negativos</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <p className="mt-4 text-[10px] text-gray-400 text-center italic">
+                                Coincidencia en 43 de 50 parches (86.0%). Las 7 discrepancias ocurrieron en zonas limítrofes al corte del 15%.
+                            </p>
+                        </div>
+
+                        <div className="lg:col-span-6 bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col justify-between">
+                            <div>
+                                <h3 className="text-xs font-bold text-gray-700 uppercase tracking-widest mb-1">
+                                    Ficha Técnica del Estudio en Doble Ciego
+                                </h3>
+                                <p className="text-xs text-gray-400 mb-4">
+                                    Parámetros del protocolo de validación clínica conducido en el Hospital Virgen de la Puerta / EsSalud.
+                                </p>
+                            </div>
+
+                            <ul className="space-y-3 text-xs divide-y divide-gray-100">
+                                <li className="flex justify-between items-center pt-2">
+                                    <span className="text-gray-500 font-medium">Médico Evaluador 1</span>
+                                    <span className="font-semibold text-gray-800">Dra. Zaida (Patóloga Principal)</span>
+                                </li>
+                                <li className="flex justify-between items-center pt-2">
+                                    <span className="text-gray-500 font-medium">Médico Evaluador 2</span>
+                                    <span className="font-semibold text-gray-800">Dra. Patricia (Patóloga Re-evaluadora)</span>
+                                </li>
+                                <li className="flex justify-between items-center pt-2">
+                                    <span className="text-gray-500 font-medium">Muestreo Histopatológico</span>
+                                    <span className="font-mono font-semibold text-[#00539C]">n = 50 parches digitales (40x, 512×512 px)</span>
+                                </li>
+                                <li className="flex justify-between items-center pt-2">
+                                    <span className="text-gray-500 font-medium">Promedio Estimado Patóloga 1</span>
+                                    <span className="font-mono font-bold text-gray-700">22.53 %</span>
+                                </li>
+                                <li className="flex justify-between items-center pt-2">
+                                    <span className="text-gray-500 font-medium">Promedio Estimado Patóloga 2</span>
+                                    <span className="font-mono font-bold text-gray-700">23.50 %</span>
+                                </li>
+                                <li className="flex justify-between items-center pt-2">
+                                    <span className="text-gray-500 font-medium">Promedio Cuantificado por IA</span>
+                                    <span className="font-mono font-bold text-[#00539C]">16.75 %</span>
+                                </li>
+                                <li className="flex justify-between items-center pt-2">
+                                    <span className="text-gray-500 font-medium">Diferencia Absoluta Media</span>
+                                    <span className="font-mono font-bold text-amber-600">10.54 %</span>
+                                </li>
+                            </ul>
+
+                            <div className="mt-4 p-3 bg-blue-50/60 rounded-lg border border-blue-100 text-[11px] text-gray-600 leading-relaxed">
+                                <strong>Hallazgo Clínico:</strong> La estimación visual manual de los patólogos tiende a sobrestimar la positividad cromógena en zonas con alta densidad nuclear. La cuantificación computacional basada en segmentación celular individual reduce el sesgo cognitivo subjetivo, proporcionando conteos celulares discretos fidedignos.
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Tabla de los 50 Parches Clinicos Evaluados */}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                        <div className="p-4 border-b border-gray-200 bg-gray-50 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                            <div>
+                                <h3 className="text-xs font-bold text-gray-700 uppercase tracking-widest">
+                                    Auditoría Detallada de Parches Clínicos (n = 50)
+                                </h3>
+                                <p className="text-[11px] text-gray-400 mt-0.5">
+                                    Contraste parche a parche: Dra. Zaida vs. Dra. Patricia vs. Consenso vs. IA.
+                                </p>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <div className="flex bg-white rounded-lg border border-gray-200 p-0.5 text-xs">
+                                    <button
+                                        type="button"
+                                        onClick={() => setClinicalFilter('all')}
+                                        className={`px-3 py-1 rounded font-semibold cursor-pointer ${
+                                            clinicalFilter === 'all'
+                                                ? 'bg-[#00539C] text-white'
+                                                : 'text-gray-600 hover:text-gray-900'
+                                        }`}
+                                    >
+                                        Todos (50)
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setClinicalFilter('match')}
+                                        className={`px-3 py-1 rounded font-semibold cursor-pointer ${
+                                            clinicalFilter === 'match'
+                                                ? 'bg-green-600 text-white'
+                                                : 'text-gray-600 hover:text-gray-900'
+                                        }`}
+                                    >
+                                        Coincidentes (43)
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setClinicalFilter('discrepant')}
+                                        className={`px-3 py-1 rounded font-semibold cursor-pointer ${
+                                            clinicalFilter === 'discrepant'
+                                                ? 'bg-amber-600 text-white'
+                                                : 'text-gray-600 hover:text-gray-900'
+                                        }`}
+                                    >
+                                        Discrepancias (7)
+                                    </button>
+                                </div>
+
+                                <input
+                                    type="text"
+                                    placeholder="Buscar parche..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="px-3 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#00539C]"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="overflow-x-auto max-h-[460px]">
+                            <table className="w-full text-left border-collapse text-xs">
+                                <thead className="sticky top-0 bg-gray-50 border-b border-gray-200 text-[10px] font-bold text-gray-500 uppercase tracking-wider shadow-xs">
+                                    <tr>
+                                        <th className="px-4 py-3">N°</th>
+                                        <th className="px-4 py-3">Archivo 40x</th>
+                                        <th className="px-4 py-3 text-center">Dra. Zaida (P1)</th>
+                                        <th className="px-4 py-3 text-center">Dra. Patricia (P2)</th>
+                                        <th className="px-4 py-3 text-center">Consenso Humano</th>
+                                        <th className="px-4 py-3 text-center text-[#00539C]">U-Net PRO (IA)</th>
+                                        <th className="px-4 py-3 text-center">Núcleos (Ki-67+ / Tot)</th>
+                                        <th className="px-4 py-3 text-center">Dif. Absoluta</th>
+                                        <th className="px-4 py-3 text-right">Coincidencia</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {filteredPatches.map((p) => (
+                                        <tr key={p.id} className="hover:bg-gray-50/80 transition-colors">
+                                            <td className="px-4 py-2.5 font-mono text-gray-400">#{p.id}</td>
+                                            <td className="px-4 py-2.5 font-semibold text-gray-800 font-mono">{p.fileName}</td>
+                                            <td className="px-4 py-2.5 text-center font-mono text-gray-700">{p.p1Percent}%</td>
+                                            <td className="px-4 py-2.5 text-center font-mono text-gray-700">{p.p2Percent}%</td>
+                                            <td className="px-4 py-2.5 text-center font-mono font-bold text-gray-900 bg-gray-50/50">
+                                                {p.humanConsensusPercent}%
+                                            </td>
+                                            <td className="px-4 py-2.5 text-center font-mono font-bold text-[#00539C] bg-blue-50/30">
+                                                {p.iaPercent}%
+                                            </td>
+                                            <td className="px-4 py-2.5 text-center font-mono text-gray-600">
+                                                {p.positiveNuclei} / {p.totalNuclei}
+                                            </td>
+                                            <td className="px-4 py-2.5 text-center font-mono text-gray-500">
+                                                {p.absoluteDiff}%
+                                            </td>
+                                            <td className="px-4 py-2.5 text-right">
+                                                <span
+                                                    className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                                                        p.clinicalMatch
+                                                            ? 'bg-green-100 text-green-700 border border-green-200'
+                                                            : 'bg-amber-100 text-amber-700 border border-amber-200'
+                                                    }`}
+                                                >
+                                                    {p.clinicalMatch ? 'Coincidente' : 'Fronteriza'}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                <div className="space-y-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 {/* Matriz de Confusion */}
                 <div className="lg:col-span-7 bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col justify-between">
                     <div>
@@ -286,5 +625,7 @@ export default function MetricsTab() {
                 </p>
             </div>
         </div>
-    );
+    )}
+</div>
+);
 }

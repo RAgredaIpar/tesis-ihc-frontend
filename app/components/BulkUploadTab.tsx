@@ -3,6 +3,7 @@
 import { useState, DragEvent, ChangeEvent } from 'react';
 import Image from 'next/image';
 import { guardarDiagnostico } from '@/app/actions/auth';
+import { sanitizarImagenCliente } from '@/lib/privacySanitizer';
 import { QueueItem, QuantifyResponse } from '@/lib/types';
 
 type ModalViewType = 'IHC Sintética' | 'Auditoría HSV' | 'Score-CAM';
@@ -92,10 +93,11 @@ export default function BulkUploadTab() {
             updatedQueue[i].status = 'procesando';
             setQueue([...updatedQueue]);
 
-            const formData = new FormData();
-            formData.append('file', updatedQueue[i].file);
-
             try {
+                const sanitization = await sanitizarImagenCliente(updatedQueue[i].file);
+                const formData = new FormData();
+                formData.append('file', sanitization.sanitizedFile);
+
                 const response = await fetch(`${BACKEND_URL}/api/quantify?mode=benchmark&use_watershed=true&use_tta=true`, {
                     method: 'POST',
                     body: formData,

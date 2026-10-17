@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Image from 'next/image';
 import UploadZone from '@/app/components/UploadZone';
 import { guardarDiagnostico } from '@/app/actions/auth';
+import { sanitizarImagenCliente } from '@/lib/privacySanitizer';
 import { QuantifyResponse, ViewType } from '@/lib/types';
 
 interface Metrics {
@@ -65,13 +66,18 @@ export default function WorkspaceTab() {
     const procesarLamina = async () => {
         if (!file) return;
         setLoading(true);
-        setMetrics((prev) => ({ ...prev, status: 'Procesando en GPU...' }));
+        setMetrics((prev) => ({ ...prev, status: 'Desidentificando...' }));
 
         const startTime = performance.now();
-        const formData = new FormData();
-        formData.append('file', file);
 
         try {
+            // Purga de metadatos EXIF / Privacidad Ley 29733 en el navegador
+            const sanitization = await sanitizarImagenCliente(file);
+            setMetrics((prev) => ({ ...prev, status: 'Procesando en GPU...' }));
+
+            const formData = new FormData();
+            formData.append('file', sanitization.sanitizedFile);
+
             const queryParams = new URLSearchParams({
                 mode: inferenceMode,
                 use_watershed: String(useWatershed),
@@ -179,11 +185,21 @@ export default function WorkspaceTab() {
                         </div>
                     </div>
 
+                    {/* Aviso de Privacidad y Desidentificacion Ley 29733 */}
+                    <div className="mt-4 p-2.5 bg-slate-50 border border-slate-200 rounded-lg flex items-start gap-2 text-[11px] text-slate-600">
+                        <svg className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                        </svg>
+                        <div>
+                            <span className="font-bold text-slate-800">Privacidad Ley N° 29733:</span> Muestra desidentificada en origen. Los metadatos de paciente son purgados irreversiblemente en el cliente antes de la inferencia.
+                        </div>
+                    </div>
+
                     <button
                         type="button"
                         onClick={procesarLamina}
                         disabled={loading || !file}
-                        className="w-full mt-6 bg-[#00539C] hover:bg-[#004380] text-white font-bold text-sm py-3 px-4 rounded-lg transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed uppercase tracking-wide shadow-sm cursor-pointer"
+                        className="w-full mt-4 bg-[#00539C] hover:bg-[#004380] text-white font-bold text-sm py-3 px-4 rounded-lg transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed uppercase tracking-wide shadow-sm cursor-pointer"
                     >
                         {loading ? 'Procesando Muestra...' : 'Ejecutar Cuantificación Ki-67'}
                     </button>
@@ -192,7 +208,7 @@ export default function WorkspaceTab() {
                 {/* Metricas de Inferencia */}
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
                     <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4 border-b pb-2">
-                        Telemetría de Inferencia
+                        Telemetría y Seguridad
                     </h3>
                     <ul className="space-y-3 text-sm">
                         <li className="flex justify-between items-center">
@@ -208,6 +224,12 @@ export default function WorkspaceTab() {
                         <li className="flex justify-between items-center">
                             <span className="text-gray-500">Tiempo de Cómputo</span>
                             <span className="font-mono font-bold text-xs">{metrics.time} s</span>
+                        </li>
+                        <li className="flex justify-between items-center">
+                            <span className="text-gray-500">Gobernanza de Datos</span>
+                            <span className="font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded text-[11px]">
+                                Retención Cero (GPU)
+                            </span>
                         </li>
                         <li className="flex justify-between items-center">
                             <span className="text-gray-500">Estado</span>

@@ -55,6 +55,16 @@ export interface HistoryRecord {
     positive_nuclei: number;
     positivity_index: number;
     risk_level: string;
+    usuario_id?: string;
+    medico_nombre?: string;
+}
+
+export interface UserProfileRecord {
+    id: string;
+    email: string;
+    nombre_completo: string;
+    rol: 'admin' | 'patologo';
+    created_at: string;
 }
 
 export interface DiagnosticsSaveInput {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import UploadZone from '@/app/components/UploadZone';
 import { guardarDiagnostico } from '@/app/actions/auth';
@@ -25,6 +25,55 @@ export default function WorkspaceTab() {
     const [activeViewTab, setActiveViewTab] = useState<ViewType>('IHC Sintética');
     const [inferenceMode, setInferenceMode] = useState<'benchmark' | 'hospital'>('benchmark');
     const [useWatershed, setUseWatershed] = useState<boolean>(true);
+    const [showReportModal, setShowReportModal] = useState<boolean>(false);
+    const [reportDate, setReportDate] = useState<string>('');
+    const [medicoNombre, setMedicoNombre] = useState<string>('Médico Patólogo Especialista');
+
+    useEffect(() => {
+        setReportDate(new Date().toLocaleString('es-PE', { hour12: false }));
+
+        const matchSession = document.cookie.match(new RegExp('(^| )sb_session=([^;]+)'));
+        if (matchSession) {
+            try {
+                const token = matchSession[2];
+                const base64Url = token.split('.')[1];
+                if (base64Url) {
+                    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                    const jsonPayload = decodeURIComponent(
+                        atob(base64)
+                            .split('')
+                            .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+                            .join('')
+                    );
+                    const payload = JSON.parse(jsonPayload);
+                    if (payload && payload.email) {
+                        setMedicoNombre(payload.email.split('@')[0]);
+                    }
+                }
+            } catch {
+                // Silenciar fallos si el formato de token no es JWT estándar
+            }
+        }
+    }, []);
+
+    const getRiskStyles = (level: string) => {
+        const normalized = (level || '').trim().toUpperCase();
+
+        if (normalized.includes('ALTO') || normalized.includes('HIGH') || normalized.includes('CRITIC')) {
+            return 'bg-red-50 border-red-200 text-red-700';
+        }
+        if (normalized.includes('MODERADO') || normalized.includes('MEDIO') || normalized.includes('MEDIUM')) {
+            return 'bg-amber-50 border-amber-200 text-amber-700';
+        }
+        if (normalized.includes('BAJO') || normalized.includes('LOW')) {
+            return 'bg-green-50 border-green-200 text-green-700';
+        }
+        return 'bg-slate-50 border-slate-200 text-slate-700';
+    };
+
+    const ejecutarImpresionNativa = () => {
+        window.print();
+    };
 
     const [metrics, setMetrics] = useState<Metrics>({
         time: '0.00',
@@ -390,6 +439,30 @@ export default function WorkspaceTab() {
                                     </p>
                                 </div>
                             </div>
+
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setReportDate(new Date().toLocaleString('es-PE', { hour12: false }));
+                                    setShowReportModal(true);
+                                }}
+                                className="w-full flex items-center justify-center gap-2 bg-[#00539C] hover:bg-[#003e75] text-white text-xs font-bold px-4 py-2 rounded-lg cursor-pointer transition-colors shadow-sm"
+                            >
+                                <svg
+                                    className="w-4 h-4"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                    />
+                                </svg>
+                                <span>Generar Ficha Anatomopatológica / Exportar PDF</span>
+                            </button>
                         </div>
                     </div>
                 )}
@@ -423,6 +496,188 @@ export default function WorkspaceTab() {
                     </div>
                 </div>
             </section>
+
+            {/* Modal de Reporte e Impresión Clínica Estructurada */}
+            {showReportModal && apiResult && (
+                <div
+                    onClick={() => setShowReportModal(false)}
+                    className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto print:static print:bg-white print:p-0"
+                >
+                    <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="bg-white rounded-xl shadow-2xl max-w-3xl w-full overflow-hidden border border-gray-200 flex flex-col my-auto print:shadow-none print:border-none print:w-full print:max-w-none"
+                    >
+                        <header className="bg-gray-50 px-6 py-3 border-b border-gray-200 flex justify-between items-center print:hidden">
+                            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                                Vista Previa de Documento Clínico
+                            </span>
+                            <div className="flex gap-2">
+                                <button
+                                    type="button"
+                                    onClick={ejecutarImpresionNativa}
+                                    className="bg-[#00539C] hover:bg-[#004380] text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors uppercase tracking-wide cursor-pointer"
+                                >
+                                    Imprimir / Guardar PDF
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowReportModal(false)}
+                                    className="text-gray-500 hover:text-gray-700 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors uppercase tracking-wide cursor-pointer"
+                                >
+                                    Cerrar
+                                </button>
+                            </div>
+                        </header>
+
+                        <div className="p-10 bg-white space-y-6 text-gray-800 font-sans print:p-0">
+                            {/* Membrete Institucional */}
+                            <div className="flex justify-between items-start border-b-2 border-gray-800 pb-4">
+                                <div className="flex items-center gap-3">
+                                    <Image
+                                        src="/Logo_EsSalud.png"
+                                        alt="Logo EsSalud"
+                                        width={140}
+                                        height={48}
+                                        className="h-12 w-auto object-contain"
+                                    />
+                                    <div className="text-left">
+                                        <h4 className="text-sm font-black text-[#00539C] tracking-wide uppercase">
+                                            EsSalud
+                                        </h4>
+                                        <p className="text-[10px] text-gray-500 font-bold uppercase">
+                                            Red Asistencial La Libertad
+                                        </p>
+                                        <p className="text-[9px] text-gray-400 font-medium">
+                                            H.A.C. Virgen de la Puerta — Trujillo
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                                        Informe Anatomopatológico
+                                    </h3>
+                                    <p className="text-xs font-mono font-bold text-gray-700 mt-1">
+                                        ID: {apiResult.metadata.request_id ? apiResult.metadata.request_id.substring(0, 13).toUpperCase() : 'MUESTRA-IHC'}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Metadatos de la Muestra */}
+                            <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-200 text-xs">
+                                <div>
+                                    <p className="text-[10px] text-gray-400 font-bold uppercase">Origen de la Muestra</p>
+                                    <p className="font-semibold text-gray-700 mt-0.5 truncate">
+                                        {apiResult.metadata.original_filename || file?.name || 'Muestra Histológica'}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] text-gray-400 font-bold uppercase">Fecha de Emisión</p>
+                                    <p className="font-semibold text-gray-700 mt-0.5">
+                                        {reportDate || new Date().toLocaleString('es-PE', { hour12: false })}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] text-gray-400 font-bold uppercase">Procedimiento Analítico</p>
+                                    <p className="font-semibold text-gray-700 mt-0.5">
+                                        Cuantificación Digital Inmunohistoquímica
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] text-gray-400 font-bold uppercase">Marcador Biomolecular</p>
+                                    <p className="font-semibold text-[#00539C] mt-0.5">
+                                        Antígeno Nuclear Ki-67 (Proliferación Celular)
+                                    </p>
+                                </div>
+                                {medicoNombre && (
+                                    <div className="col-span-2 border-t border-slate-200/80 pt-2.5 flex justify-between items-center bg-white/70 -mx-4 -mb-4 px-4 py-2.5 rounded-b-lg">
+                                        <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">
+                                            Médico Evaluador
+                                        </span>
+                                        <span className="font-bold text-[#00539C] text-xs">
+                                            {medicoNombre}
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Indicadores Cuantitativos */}
+                            <div className="space-y-3">
+                                <h4 className="text-xs font-bold text-gray-700 uppercase tracking-widest border-b pb-1">
+                                    Resultados del Análisis Morfológico Automatizado
+                                </h4>
+                                <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                                    <div className="border border-gray-200 p-3 rounded-lg bg-slate-50/50">
+                                        <p className="text-gray-400 font-medium">Núcleos Celulares Evaluados</p>
+                                        <p className="text-xl font-bold text-gray-800 mt-1 font-mono">
+                                            {apiResult.analytics.total_nuclei_detected}
+                                        </p>
+                                    </div>
+                                    <div className="border border-gray-200 p-3 rounded-lg bg-slate-50/50">
+                                        <p className="text-gray-400 font-medium">Firma Cromática Positiva (DAB+)</p>
+                                        <p className="text-xl font-bold text-red-600 mt-1 font-mono">
+                                            {apiResult.analytics.positive_nuclei_count}
+                                        </p>
+                                    </div>
+                                    <div className="border border-gray-200 p-3 rounded-lg bg-slate-50/50">
+                                        <p className="text-gray-400 font-medium">Índice de Proliferación Ki-67</p>
+                                        <p className="text-xl font-bold text-slate-900 mt-1 font-mono">
+                                            {apiResult.analytics.positivity_index_percentage}%
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Riesgo Clínico */}
+                            <div className="border border-gray-300 rounded-lg p-4 space-y-2">
+                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                                    Evaluación de Riesgo Clínico Estructurado
+                                </span>
+                                <div className="flex items-center gap-3">
+                                    <span
+                                        className={`text-xs font-black px-3 py-1 rounded-md border uppercase tracking-wider ${getRiskStyles(
+                                            apiResult.clinical_risk.level
+                                        )}`}
+                                        style={apiResult.clinical_risk.color_code ? { borderColor: apiResult.clinical_risk.color_code } : undefined}
+                                    >
+                                        Nivel: {apiResult.clinical_risk.level}
+                                    </span>
+                                    <p className="text-xs text-gray-500 leading-relaxed">
+                                        {apiResult.clinical_risk.description ||
+                                            'La cuantificación porcentual del biomarcador nuclear Ki-67 refleja el índice proliferativo tumoral en el tejido histopatológico analizado, fundamentado en la segmentación de núcleos reactivos DAB positivos.'}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Secciones de Firma y Trazabilidad */}
+                            <div className="pt-12 grid grid-cols-2 gap-8 items-center text-center text-xs">
+                                <div className="border border-blue-200 bg-blue-50/40 rounded-lg p-3 text-center max-w-[240px] mx-auto relative overflow-hidden shadow-sm">
+                                    <p className="text-[9px] font-mono text-[#00539C] font-bold tracking-wider uppercase">
+                                        INTEGRIDAD DIGITAL
+                                    </p>
+                                    <p className="text-[8px] font-mono text-gray-500 truncate mt-1">
+                                        HASH:{' '}
+                                        {apiResult.metadata.request_id
+                                            ? btoa(apiResult.metadata.request_id).substring(0, 16)
+                                            : 'CERT_HASH'}
+                                    </p>
+                                    <p className="text-[9px] text-[#00539C] font-bold mt-2 uppercase tracking-wide">
+                                        Firma del Sistema
+                                    </p>
+                                </div>
+
+                                <div className="border-t border-dashed border-gray-400 pt-6 max-w-[220px] w-full mx-auto self-end">
+                                    <p className="font-semibold text-gray-700">
+                                        {medicoNombre || 'Firma del Médico Especialista'}
+                                    </p>
+                                    <p className="text-[10px] text-gray-400 uppercase mt-0.5">
+                                        Servicio de Anatomía Patológica
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

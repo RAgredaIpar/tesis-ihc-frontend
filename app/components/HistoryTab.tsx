@@ -13,6 +13,8 @@ interface DatabaseHistoryRow {
     positive_nuclei?: number;
     positivity_index?: number;
     risk_level?: string;
+    usuario_id?: string;
+    medico_nombre?: string;
 }
 
 /**
@@ -22,42 +24,59 @@ export default function HistoryTab() {
     const [records, setRecords] = useState<HistoryRecord[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const [activeReport, setActiveReport] = useState<HistoryRecord | null>(null);
+    const [userRole, setUserRole] = useState<'admin' | 'patologo'>('patologo');
+    const [filtro, setFiltro] = useState<'mis_muestras' | 'todas'>('mis_muestras');
+
+    const cargarHistorial = async (tipoFiltro: 'mis_muestras' | 'todas') => {
+        setLoading(true);
+        try {
+            const res = await obtenerHistorial(tipoFiltro);
+            if (!res.success) {
+                throw new Error(res.error || 'Fallo al recuperar registros');
+            }
+
+            if (res.data) {
+                const typedData = res.data as unknown as DatabaseHistoryRow[];
+                const mapped: HistoryRecord[] = typedData.map((item) => ({
+                    id: item.request_id,
+                    request_id: item.request_id,
+                    nombre_archivo: item.nombre_archivo,
+                    date: item.created_at
+                        ? new Date(item.created_at).toLocaleString('es-PE', { hour12: false })
+                        : 'Sin fecha',
+                    total_nuclei: item.total_nuclei || 0,
+                    positive_nuclei: item.positive_nuclei || 0,
+                    positivity_index: item.positivity_index || 0,
+                    risk_level: item.risk_level || 'No definido',
+                    usuario_id: item.usuario_id,
+                    medico_nombre: item.medico_nombre || 'Especialista en Patología',
+                }));
+                setRecords(mapped);
+            }
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Error desconocido';
+            console.error('Error al sincronizar historial de diagnósticos:', message);
+            setRecords([]);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const cargarHistorial = async () => {
-            setLoading(true);
-            try {
-                const res = await obtenerHistorial();
-                if (!res.success) {
-                    throw new Error(res.error || 'Fallo al recuperar registros');
-                }
+        const match = document.cookie.match(new RegExp('(^| )user_role=([^;]+)'));
+        const rolDetectado = match && match[2] === 'admin' ? 'admin' : 'patologo';
+        setUserRole(rolDetectado);
 
-                if (res.data) {
-                    const typedData = res.data as unknown as DatabaseHistoryRow[];
-                    const mapped: HistoryRecord[] = typedData.map((item) => ({
-                        id: item.request_id,
-                        request_id: item.request_id,
-                        nombre_archivo: item.nombre_archivo,
-                        date: item.created_at
-                            ? new Date(item.created_at).toLocaleString('es-PE', { hour12: false })
-                            : 'Sin fecha',
-                        total_nuclei: item.total_nuclei || 0,
-                        positive_nuclei: item.positive_nuclei || 0,
-                        positivity_index: item.positivity_index || 0,
-                        risk_level: item.risk_level || 'No definido',
-                    }));
-                    setRecords(mapped);
-                }
-            } catch (err: unknown) {
-                const message = err instanceof Error ? err.message : 'Error desconocido';
-                console.error('Error al sincronizar historial de diagnósticos:', message);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        cargarHistorial();
+        const filtroInicial = rolDetectado === 'admin' ? 'todas' : 'mis_muestras';
+        setFiltro(filtroInicial);
+        void cargarHistorial(filtroInicial);
     }, []);
+
+    const handleCambioFiltro = (nuevoFiltro: 'mis_muestras' | 'todas') => {
+        if (filtro === nuevoFiltro && !loading) return;
+        setFiltro(nuevoFiltro);
+        void cargarHistorial(nuevoFiltro);
+    };
 
     const getRiskStyles = (level: string) => {
         const normalized = (level || '').trim().toUpperCase();
@@ -81,13 +100,30 @@ export default function HistoryTab() {
     return (
         <div className="max-w-7xl mx-auto space-y-6 animate-fade-slide">
             {/* Cabecera */}
-            <header className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex justify-between items-center print:hidden">
+            <header className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden">
                 <div>
-                    <h2 className="text-xl font-bold text-[#00539C] uppercase tracking-wide">
-                        Historial de Reportes e Integración Clínica
-                    </h2>
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <h2 className="text-xl font-bold text-[#00539C] uppercase tracking-wide">
+                            {userRole === 'admin'
+                                ? filtro === 'todas'
+                                    ? 'Registro General del Hospital (Auditoría)'
+                                    : 'Mis Evaluaciones Clínicas'
+                                : 'Mis Diagnósticos Clínicos'}
+                        </h2>
+                        {userRole === 'admin' ? (
+                            <span className="text-[10px] bg-purple-50 text-purple-700 border border-purple-200 px-2 py-0.5 rounded font-bold uppercase tracking-wider">
+                                Modo Auditor Institucional
+                            </span>
+                        ) : (
+                            <span className="text-[10px] bg-blue-50 text-[#00539C] border border-blue-200 px-2 py-0.5 rounded font-bold uppercase tracking-wider">
+                                Ley 29733 (Confidencialidad Médica)
+                            </span>
+                        )}
+                    </div>
                     <p className="text-gray-500 text-sm mt-1">
-                        Registro auditable de muestras histopatológicas evaluadas y cuantificadas en el sistema.
+                        {userRole === 'admin' && filtro === 'todas'
+                            ? 'Registro institucional centralizado y auditable de todas las muestras histopatológicas evaluadas por el equipo médico.'
+                            : 'Registro individual de muestras histopatológicas evaluadas y cuantificadas bajo su firma médica profesional.'}
                     </p>
                 </div>
                 <div className="text-right hidden sm:block">
@@ -96,11 +132,57 @@ export default function HistoryTab() {
                 </div>
             </header>
 
+            {/* Selector de Pestañas para Administradores */}
+            {userRole === 'admin' && (
+                <div className="flex items-center gap-2 bg-gray-100 p-1.5 rounded-xl border border-gray-200 w-fit print:hidden">
+                    <button
+                        type="button"
+                        onClick={() => handleCambioFiltro('mis_muestras')}
+                        className={`px-4 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center gap-2 ${
+                            filtro === 'mis_muestras'
+                                ? 'bg-white text-[#00539C] shadow-sm border border-gray-200'
+                                : 'text-gray-600 hover:text-gray-900'
+                        }`}
+                    >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                            />
+                        </svg>
+                        Mis Evaluaciones
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => handleCambioFiltro('todas')}
+                        className={`px-4 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center gap-2 ${
+                            filtro === 'todas'
+                                ? 'bg-[#00539C] text-white shadow-sm'
+                                : 'text-gray-600 hover:text-gray-900'
+                        }`}
+                    >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+                            />
+                        </svg>
+                        Registro General del Hospital (Auditoría)
+                    </button>
+                </div>
+            )}
+
             {/* Tabla de Registros */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden print:hidden">
                 <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
                     <h3 className="text-xs font-bold text-gray-700 uppercase tracking-widest">
-                        Archivo Digital de Diagnósticos
+                        {userRole === 'admin' && filtro === 'todas'
+                            ? 'Archivo Central Hospitalario — Registro Multiusuario'
+                            : 'Archivo Digital de Diagnósticos Clínicos'}
                     </h3>
                     <span className="text-[10px] bg-blue-50 text-[#00539C] px-2 py-0.5 rounded font-bold uppercase font-mono">
                         Registros: {records.length}
@@ -117,9 +199,15 @@ export default function HistoryTab() {
                         </div>
                     ) : records.length === 0 ? (
                         <div className="h-48 flex flex-col items-center justify-center text-gray-400 gap-1">
-                            <p className="text-xs uppercase tracking-widest font-bold">No se registran diagnósticos</p>
+                            <p className="text-xs uppercase tracking-widest font-bold">
+                                {filtro === 'mis_muestras'
+                                    ? 'No se registran diagnósticos asociados a su cuenta'
+                                    : 'No se registran diagnósticos en el archivo general'}
+                            </p>
                             <p className="text-xs text-gray-400">
-                                Procese muestras en la mesa de trabajo para poblar la base de datos.
+                                {filtro === 'mis_muestras'
+                                    ? 'Procese muestras en la mesa de trabajo para poblar su registro clínico personal.'
+                                    : 'Procese muestras en el sistema para poblar la base de datos institucional.'}
                             </p>
                         </div>
                     ) : (
@@ -127,6 +215,9 @@ export default function HistoryTab() {
                             <thead>
                                 <tr className="border-b border-gray-200 bg-gray-50/50 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
                                     <th className="px-6 py-3">Identificador de Muestra</th>
+                                    {userRole === 'admin' && filtro === 'todas' && (
+                                        <th className="px-6 py-3">Médico Evaluador</th>
+                                    )}
                                     <th className="px-6 py-3">Fecha de Inferencia</th>
                                     <th className="px-6 py-3">Núcleos Totales</th>
                                     <th className="px-6 py-3">DAB+ (Ki-67+)</th>
@@ -144,6 +235,16 @@ export default function HistoryTab() {
                                         >
                                             {record.nombre_archivo}
                                         </td>
+                                        {userRole === 'admin' && filtro === 'todas' && (
+                                            <td className="px-6 py-4 text-xs font-semibold text-gray-700">
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="w-2 h-2 rounded-full bg-[#00539C] shrink-0"></span>
+                                                    <span className="truncate max-w-[200px]" title={record.medico_nombre}>
+                                                        {record.medico_nombre || 'Especialista no asignado'}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                        )}
                                         <td className="px-6 py-4 text-xs text-gray-500 font-mono">{record.date}</td>
                                         <td className="px-6 py-4 font-semibold text-slate-600 font-mono">
                                             {record.total_nuclei}
@@ -198,6 +299,7 @@ export default function HistoryTab() {
                     )}
                 </div>
             </div>
+
 
             {/* Modal de Reporte e Impresion */}
             {activeReport && (
@@ -280,6 +382,16 @@ export default function HistoryTab() {
                                         Antígeno Nuclear Ki-67 (Proliferación Celular)
                                     </p>
                                 </div>
+                                {activeReport.medico_nombre && (
+                                    <div className="col-span-2 border-t border-slate-200/80 pt-2.5 flex justify-between items-center bg-white/70 -mx-4 -mb-4 px-4 py-2.5 rounded-b-lg">
+                                        <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">
+                                            Médico Evaluador
+                                        </span>
+                                        <span className="font-bold text-[#00539C] text-xs">
+                                            {activeReport.medico_nombre}
+                                        </span>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Indicadores Cuantitativos */}
@@ -347,8 +459,10 @@ export default function HistoryTab() {
                                     </p>
                                 </div>
 
-                                <div className="border-t border-dashed border-gray-400 pt-6 max-w-[200px] w-full mx-auto self-end">
-                                    <p className="font-semibold text-gray-700">Firma del Médico Especialista</p>
+                                <div className="border-t border-dashed border-gray-400 pt-6 max-w-[220px] w-full mx-auto self-end">
+                                    <p className="font-semibold text-gray-700">
+                                        {activeReport.medico_nombre || 'Firma del Médico Especialista'}
+                                    </p>
                                     <p className="text-[10px] text-gray-400 uppercase mt-0.5">
                                         Servicio de Anatomía Patológica
                                     </p>

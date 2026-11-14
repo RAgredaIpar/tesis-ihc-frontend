@@ -75,12 +75,18 @@ export async function sanitizarImagenCliente(file: File): Promise<SanitizationRe
                     const cleanName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
                     const sanitizedFile = new File([blob], cleanName, { type: 'image/png' });
 
+                    const savedWidth = canvas.width;
+                    const savedHeight = canvas.height;
+                    // Liberación inmediata de memoria gráfica en el navegador (Software Verde)
+                    canvas.width = 0;
+                    canvas.height = 0;
+
                     resolve({
                         sanitizedFile,
                         pseudonymId,
                         originalName: file.name,
-                        width: canvas.width,
-                        height: canvas.height,
+                        width: savedWidth,
+                        height: savedHeight,
                         sanitized: true,
                     });
                 }, 'image/png');

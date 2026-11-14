@@ -56,6 +56,15 @@ export default function WorkspaceTab() {
         }
     }, []);
 
+    // Liberación proactiva de memoria de ObjectURL en navegador (Software Verde / RAM cleanup)
+    useEffect(() => {
+        return () => {
+            if (preview) {
+                URL.revokeObjectURL(preview);
+            }
+        };
+    }, [preview]);
+
     const getRiskStyles = (level: string) => {
         const normalized = (level || '').trim().toUpperCase();
 
@@ -91,6 +100,11 @@ export default function WorkspaceTab() {
         if (!esValido) {
             alert('Formato no admitido. Seleccione un archivo de imagen histopatológica (.png, .jpg, .jpeg, .tif o .tiff).');
             return false;
+        }
+
+        // Revocar URL anterior para evitar fuga de memoria en navegador
+        if (preview) {
+            URL.revokeObjectURL(preview);
         }
 
         setFile(selectedFile);
@@ -273,6 +287,12 @@ export default function WorkspaceTab() {
                         <li className="flex justify-between items-center">
                             <span className="text-gray-500">Tiempo de Cómputo</span>
                             <span className="font-mono font-bold text-xs">{metrics.time} s</span>
+                        </li>
+                        <li className="flex justify-between items-center">
+                            <span className="text-gray-500">Eficiencia Verde</span>
+                            <span className="font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded text-[11px] font-mono">
+                                Race-to-Sleep (&lt; 2.2s)
+                            </span>
                         </li>
                         <li className="flex justify-between items-center">
                             <span className="text-gray-500">Gobernanza de Datos</span>

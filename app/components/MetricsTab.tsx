@@ -624,6 +624,73 @@ export default function MetricsTab() {
                     Valor Predictivo Positivo consistente de 81.08% en la identificación del biomarcador Ki-67.
                 </p>
             </div>
+
+            {/* Panel de Ingeniería de Software Verde y Sostenibilidad Computacional */}
+            <div className="bg-gradient-to-br from-emerald-50/70 via-white to-blue-50/50 p-6 rounded-xl shadow-sm border border-emerald-200/80">
+                <div className="flex items-center gap-2 mb-4">
+                    <span className="p-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold">
+                        GREEN AI
+                    </span>
+                    <div>
+                        <h4 className="text-xs font-bold text-emerald-950 uppercase tracking-widest">
+                            Auditoría de Ingeniería de Software Verde y Eficiencia Computacional
+                        </h4>
+                        <p className="text-[11px] text-emerald-800">
+                            Criterios técnicos alineados a la Lista de Verificación de Software Sostenible (Taller Integrador II).
+                        </p>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-2">
+                    <div className="bg-white/90 p-4 rounded-lg border border-emerald-100 shadow-xs">
+                        <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block mb-1">
+                            Eficiencia de Modelo
+                        </span>
+                        <div className="text-xl font-bold font-mono text-gray-900">
+                            -75.3%
+                        </div>
+                        <p className="text-[11px] text-gray-500 mt-1">
+                            U-Net PRO (13.4M params) frente a Pix2Pix GAN (54.2M params), minimizando huella VRAM.
+                        </p>
+                    </div>
+
+                    <div className="bg-white/90 p-4 rounded-lg border border-emerald-100 shadow-xs">
+                        <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block mb-1">
+                            Principio Race-to-Sleep
+                        </span>
+                        <div className="text-xl font-bold font-mono text-emerald-700">
+                            &lt; 2.2 s
+                        </div>
+                        <p className="text-[11px] text-gray-500 mt-1">
+                            Inferencia rápida en GPU CUDA que retorna de inmediato el hardware al estado de reposo P8.
+                        </p>
+                    </div>
+
+                    <div className="bg-white/90 p-4 rounded-lg border border-emerald-100 shadow-xs">
+                        <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block mb-1">
+                            Nube Serverless
+                        </span>
+                        <div className="text-xl font-bold font-mono text-gray-900">
+                            Scale-to-Zero
+                        </div>
+                        <p className="text-[11px] text-gray-500 mt-1">
+                            Vercel y Supabase apagan instancias inactivas, eliminando el consumo eléctrico fantasma (idle).
+                        </p>
+                    </div>
+
+                    <div className="bg-white/90 p-4 rounded-lg border border-emerald-100 shadow-xs">
+                        <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block mb-1">
+                            Gobernanza de Memoria
+                        </span>
+                        <div className="text-xl font-bold font-mono text-blue-800">
+                            Cero Retención
+                        </div>
+                        <p className="text-[11px] text-gray-500 mt-1">
+                            Purga de buffers Canvas, liberación de ObjectURLs y vaciado forzado de caché CUDA.
+                        </p>
+                    </div>
+                </div>
+            </div>
         </div>
     )}
 </div>
